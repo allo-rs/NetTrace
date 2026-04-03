@@ -1,0 +1,10 @@
+# 编译产物
+nettrace
+dns-detector
+
+# MaxMind 数据库（运行时自动下载）
+*.mmdb
+*.mmdb.tmp
+
+# 其他
+*.env
