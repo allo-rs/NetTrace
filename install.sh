@@ -58,15 +58,15 @@ tar -xzf "$TMP_DIR/$ARCHIVE" -C "$TMP_DIR"
 
 # ── 配置参数 ──────────────────────────────────────────────
 if [[ -z "${DNS_DOMAIN:-}" ]]; then
-  read -rp "请输入权威 DNS 域名（如 dns.example.com）: " DNS_DOMAIN
+  read -rp "请输入权威 DNS 域名（如 dns.example.com）: " DNS_DOMAIN < /dev/tty
 fi
 if [[ -z "${NS_IP:-}" ]]; then
-  read -rp "请输入服务器公网 IP: " NS_IP
+  read -rp "请输入服务器公网 IP: " NS_IP < /dev/tty
 fi
 if [[ -z "${MAXMIND_LICENSE_KEY:-}" ]]; then
   echo "MaxMind License Key 用于自动下载/每日更新 GeoLite2-City 数据库。"
   echo "免费注册：https://www.maxmind.com/en/geolite2/signup"
-  read -rp "请输入 MaxMind License Key（留空则跳过，需手动放置数据库文件）: " MAXMIND_LICENSE_KEY
+  read -rp "请输入 MaxMind License Key（留空则跳过，需手动放置数据库文件）: " MAXMIND_LICENSE_KEY < /dev/tty
 fi
 WEB_PORT="${WEB_PORT:-:8080}"
 DNS_PORT="${DNS_PORT:-:53}"
