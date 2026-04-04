@@ -19,6 +19,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -1214,26 +1215,75 @@ type streamServiceDef struct {
 	checkFn func(status int, finalURL, body string) (available bool, region, note string)
 }
 
+// isoToName 将 ISO 3166-1 alpha-2 国家代码转为中文名，未收录则返回原代码。
+func isoToName(code string) string {
+	if code == "" {
+		return ""
+	}
+	names := map[string]string{
+		"US": "美国", "GB": "英国", "CA": "加拿大", "AU": "澳大利亚",
+		"JP": "日本", "KR": "韩国", "SG": "新加坡", "HK": "香港",
+		"TW": "台湾", "DE": "德国", "FR": "法国", "NL": "荷兰",
+		"IT": "意大利", "ES": "西班牙", "PT": "葡萄牙", "SE": "瑞典",
+		"NO": "挪威", "FI": "芬兰", "DK": "丹麦", "CH": "瑞士",
+		"AT": "奥地利", "BE": "比利时", "PL": "波兰", "CZ": "捷克",
+		"TR": "土耳其", "RU": "俄罗斯", "IN": "印度", "BR": "巴西",
+		"MX": "墨西哥", "AR": "阿根廷", "CL": "智利", "CO": "哥伦比亚",
+		"ZA": "南非", "TH": "泰国", "MY": "马来西亚", "ID": "印度尼西亚",
+		"PH": "菲律宾", "VN": "越南", "NZ": "新西兰",
+		"SA": "沙特阿拉伯", "AE": "阿联酋", "IL": "以色列",
+	}
+	if name, ok := names[strings.ToUpper(code)]; ok {
+		return name
+	}
+	return strings.ToUpper(code)
+}
+
+// parseCountry 按优先级依次尝试 patterns，从响应体中提取 ISO 国家代码。
+func parseCountry(body string, patterns []string) string {
+	for _, p := range patterns {
+		re := regexp.MustCompile(p)
+		if m := re.FindStringSubmatch(body); len(m) > 1 {
+			return strings.ToUpper(m[1])
+		}
+	}
+	return ""
+}
+
 // streamServiceList 是所有待检测服务的定义列表。
 var streamServiceList = []streamServiceDef{
 	{
 		name: "Netflix",
-		url:  "https://www.netflix.com/title/80018499",
+		url:  "https://www.netflix.com/",
 		checkFn: func(status int, finalURL, body string) (bool, string, string) {
-			if status == 200 && strings.Contains(finalURL, "/title/") {
-				return true, "", ""
+			if status != 200 {
+				return false, "", fmt.Sprintf("HTTP %d", status)
 			}
-			if strings.Contains(body, "not available") || strings.Contains(body, "unavailable in your") {
+			if strings.Contains(body, "not available in your country") ||
+				strings.Contains(body, "currently not available") {
 				return false, "", "地区不可用"
 			}
-			return false, "", fmt.Sprintf("HTTP %d", status)
+			code := parseCountry(body, []string{
+				`"requestCountry"\s*:\s*\{\s*"id"\s*:\s*"([A-Z]{2})"`,
+				`"countryCode"\s*:\s*"([A-Z]{2})"`,
+				`"country"\s*:\s*"([A-Z]{2})"`,
+			})
+			return true, isoToName(code), ""
 		},
 	},
 	{
 		name: "YouTube",
 		url:  "https://www.youtube.com/",
 		checkFn: func(status int, finalURL, body string) (bool, string, string) {
-			return status == 200, "", ""
+			if status != 200 {
+				return false, "", fmt.Sprintf("HTTP %d", status)
+			}
+			code := parseCountry(body, []string{
+				`"GL"\s*:\s*"([A-Z]{2})"`,
+				`"gl"\s*:\s*"([a-zA-Z]{2})"`,
+				`INNERTUBE_CONTEXT_GL[" ]*:\s*"([A-Z]{2})"`,
+			})
+			return true, isoToName(code), ""
 		},
 	},
 	{
@@ -1244,7 +1294,12 @@ var streamServiceList = []streamServiceDef{
 				if strings.Contains(body, "not available") || strings.Contains(body, "coming soon") {
 					return false, "", "地区不可用"
 				}
-				return true, "", ""
+				code := parseCountry(body, []string{
+					`"countryCode"\s*:\s*"([A-Z]{2})"`,
+					`"country"\s*:\s*"([A-Z]{2})"`,
+					`"region"\s*:\s*"([A-Z]{2})"`,
+				})
+				return true, isoToName(code), ""
 			}
 			if status == 403 || status == 451 {
 				return false, "", "地区封锁"
@@ -1269,7 +1324,14 @@ var streamServiceList = []streamServiceDef{
 		name: "Spotify",
 		url:  "https://open.spotify.com/",
 		checkFn: func(status int, finalURL, body string) (bool, string, string) {
-			return status == 200, "", ""
+			if status != 200 {
+				return false, "", fmt.Sprintf("HTTP %d", status)
+			}
+			code := parseCountry(body, []string{
+				`"country"\s*:\s*"([A-Z]{2})"`,
+				`"market"\s*:\s*"([A-Z]{2})"`,
+			})
+			return true, isoToName(code), ""
 		},
 	},
 	{
