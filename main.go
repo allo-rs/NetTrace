@@ -296,6 +296,27 @@ func (s *TokenStore) Len() int {
 	return len(s.entries)
 }
 
+// Peek 查询 token 对应的 resolverIP，但不删除（非消费性读取）。
+// 用于 DNS 泄漏检测的多轮轮询。
+func (s *TokenStore) Peek(token string) (string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	e, ok := s.entries[token]
+	if !ok {
+		return "", false
+	}
+	return e.resolverIP, true
+}
+
+// Delete 显式删除一组 token（泄漏检测结束后清理）。
+func (s *TokenStore) Delete(tokens []string) {
+	s.mu.Lock()
+	for _, t := range tokens {
+		delete(s.entries, t)
+	}
+	s.mu.Unlock()
+}
+
 // ══════════════════════════════════════════════════════════
 //  MaxMind GeoLite2 数据库
 // ══════════════════════════════════════════════════════════
@@ -958,6 +979,25 @@ type InfoResponse struct {
 	Found       bool     `json:"found"`
 }
 
+// LeakTokenResult 是单个探针 token 的捕获结果。
+type LeakTokenResult struct {
+	Token       string   `json:"token"`
+	Found       bool     `json:"found"`
+	ResolverIP  string   `json:"resolver_ip,omitempty"`
+	ResolverGeo *GeoInfo `json:"resolver_geo,omitempty"`
+}
+
+// LeakResponse 是 /api/leak 的响应结构。
+type LeakResponse struct {
+	ClientIP        string            `json:"client_ip"`
+	ClientGeo       *GeoInfo          `json:"client_geo,omitempty"`
+	Results         []LeakTokenResult `json:"results"`
+	UniqueResolvers []string          `json:"unique_resolvers"`
+	CapturedCount   int               `json:"captured_count"`
+	TotalCount      int               `json:"total_count"`
+	Leaked          bool              `json:"leaked"`
+}
+
 type WebServer struct {
 	cfg      *Config
 	store    *TokenStore
@@ -1070,6 +1110,72 @@ func (w *WebServer) handleGeo(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(info)
 }
 
+// handleLeak 处理 DNS 泄漏检测。
+//
+// GET /api/leak?tokens=t1,t2,t3...  — 轮询（Peek，不消费 token）
+// DELETE /api/leak?tokens=t1,t2,t3... — 检测结束，清理 token
+//
+// 泄漏判断：捕获到的 resolverIP 中存在多个不同 IP 即判定为泄漏。
+func (w *WebServer) handleLeak(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Access-Control-Allow-Origin", "*")
+	rw.Header().Set("Content-Type", "application/json")
+
+	tokensParam := r.URL.Query().Get("tokens")
+	if tokensParam == "" {
+		rw.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(rw).Encode(map[string]string{"error": "tokens 参数不能为空"})
+		return
+	}
+
+	tokens := strings.Split(tokensParam, ",")
+	// 最多接受 10 个探针，防止滥用
+	if len(tokens) > 10 {
+		tokens = tokens[:10]
+	}
+
+	// DELETE 请求：检测结束，清理 token
+	if r.Method == http.MethodDelete {
+		w.store.Delete(tokens)
+		rw.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	clientIP := getClientIP(r)
+	resp := LeakResponse{
+		ClientIP:   clientIP,
+		TotalCount: len(tokens),
+	}
+	if geo, err := getGeoInfoCached(clientIP, w.geoCache); err == nil {
+		resp.ClientGeo = geo
+	}
+
+	resolverSet := make(map[string]struct{})
+	results := make([]LeakTokenResult, 0, len(tokens))
+
+	for _, token := range tokens {
+		token = strings.TrimSpace(token)
+		result := LeakTokenResult{Token: token}
+		if resolverIP, ok := w.store.Peek(token); ok {
+			result.Found = true
+			result.ResolverIP = resolverIP
+			if geo, err := getGeoInfoCached(resolverIP, w.geoCache); err == nil {
+				result.ResolverGeo = geo
+			}
+			resolverSet[resolverIP] = struct{}{}
+			resp.CapturedCount++
+		}
+		results = append(results, result)
+	}
+
+	resp.Results = results
+	for ip := range resolverSet {
+		resp.UniqueResolvers = append(resp.UniqueResolvers, ip)
+	}
+	resp.Leaked = len(resp.UniqueResolvers) > 1
+
+	json.NewEncoder(rw).Encode(resp)
+}
+
 // handleStats 返回运行状态（建议生产环境加 IP 鉴权）。
 func (w *WebServer) handleStats(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
@@ -1138,6 +1244,7 @@ func main() {
 	mux.HandleFunc("/probe.png", webServer.handleProbe)
 	mux.HandleFunc("/api/stats", webServer.handleStats)
 	mux.HandleFunc("/api/geo", webServer.handleGeo)
+	mux.HandleFunc("/api/leak", webServer.handleLeak)
 
 	logger.Info("HTTP 开始监听 %s", cfg.WebPort)
 	if err := http.ListenAndServe(cfg.WebPort, mux); err != nil {
