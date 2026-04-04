@@ -23,7 +23,7 @@ NEXT_MAJOR := v$(shell echo $$(( $(_MAJOR) + 1 ))).0.0
 
 # ── 帮助 ────────────────────────────────────────────────────────
 .DEFAULT_GOAL := help
-.PHONY: help patch minor major release build build-all clean
+.PHONY: help patch minor major release _do_release build build-all clean
 
 help:
 	@echo "当前版本: $(CURRENT)"
@@ -48,11 +48,27 @@ major:
 
 # ── 发布（通用） ──────────────────────────────────────────────────
 release:
-ifndef V
-	$(error 请指定版本号，例如: make release V=v0.5.0)
-endif
+ifdef V
 	@echo "$(V)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$' \
 		|| (echo "错误：版本号格式须为 vX.Y.Z"; exit 1)
+	@$(MAKE) _do_release V=$(V)
+else
+	@echo "当前版本: $(CURRENT)"
+	@echo ""
+	@PS3="选择升级类型: "; \
+	select choice in "patch → $(NEXT_PATCH)" "minor → $(NEXT_MINOR)" "major → $(NEXT_MAJOR)" "手动输入" "取消"; do \
+		case $$REPLY in \
+		1) $(MAKE) _do_release V=$(NEXT_PATCH); break ;; \
+		2) $(MAKE) _do_release V=$(NEXT_MINOR); break ;; \
+		3) $(MAKE) _do_release V=$(NEXT_MAJOR); break ;; \
+		4) read -p "输入版本号 (vX.Y.Z): " V && $(MAKE) _do_release V=$$V; break ;; \
+		5) echo "已取消"; break ;; \
+		*) echo "请输入 1-5" ;; \
+		esac; \
+	done
+endif
+
+_do_release:
 	@git tag | grep -qx "$(V)" \
 		&& (echo "错误：tag $(V) 已存在"; exit 1) || true
 	@git diff --quiet && git diff --cached --quiet \
