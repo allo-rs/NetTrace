@@ -523,6 +523,130 @@
   .fade-in { animation: fadeIn 0.35s ease forwards; opacity: 0; }
   @keyframes fadeIn { to { opacity: 1; } }
 
+  /* ── WebRTC 泄漏检测行 ── */
+  .webrtc-row {
+    margin-top: 12px;
+    padding: 11px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 12px;
+  }
+  .webrtc-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: rgba(63,185,80,0.1);
+    color: var(--green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .webrtc-icon.warn { background: rgba(248,81,73,0.1); color: var(--red); }
+  .webrtc-content { flex: 1; min-width: 0; }
+  .webrtc-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .webrtc-status {
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .webrtc-ips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 6px;
+  }
+  .webrtc-ip-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .webrtc-ip-tag.leaked {
+    background: rgba(248,81,73,0.08);
+    border-color: rgba(248,81,73,0.3);
+    color: var(--red);
+  }
+
+  /* ── 流媒体解锁检测 ── */
+  .unlock-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 16px 18px 14px;
+    background: var(--bg);
+    border-top: 1px solid var(--border-muted);
+  }
+  @media (max-width: 600px) { .unlock-grid { grid-template-columns: repeat(2, 1fr); } }
+  .unlock-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    transition: border-color 0.2s;
+  }
+  .unlock-card.ok   { border-color: rgba(63,185,80,0.25); }
+  .unlock-card.fail { border-color: rgba(248,81,73,0.2); }
+  .unlock-svc {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .unlock-status {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .unlock-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--border);
+  }
+  .unlock-dot.ok      { background: var(--green); }
+  .unlock-dot.fail    { background: var(--red); }
+  .unlock-dot.timeout { background: var(--yellow); }
+  .unlock-dot.loading { background: var(--text-muted); animation: pulse 1.5s infinite; }
+  .unlock-note {
+    padding: 8px 18px 14px;
+    background: var(--bg);
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .unlock-cached {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    padding: 0 18px 12px;
+    background: var(--bg);
+  }
+
   /* ── DNS 泄漏检测区块 ── */
   .leak-section {
     margin-top: 24px;
@@ -772,6 +896,20 @@
 
   </div>
 
+  <!-- ── WebRTC 泄漏检测行 ── -->
+  <div id="webrtcRow" class="webrtc-row fade-in" style="display:none">
+    <div class="webrtc-icon" id="webrtcIcon">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+    </div>
+    <div class="webrtc-content">
+      <div class="webrtc-label">WebRTC Leak</div>
+      <div class="webrtc-status" id="webrtcStatus">检测中…</div>
+      <div class="webrtc-ips" id="webrtcIPs"></div>
+    </div>
+  </div>
+
   <!-- ── 刷新按钮 ── -->
   <button class="btn-refresh" id="refreshBtn" onclick="runDetect()" disabled>
     <svg id="refreshIcon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -804,6 +942,31 @@
       </div>
       <!-- 结果区 -->
       <div id="leakResult"></div>
+    </div>
+  </div>
+
+  <!-- ── 流媒体解锁检测 ── -->
+  <div class="leak-section" id="unlockSection" style="display:none">
+    <div class="leak-header">
+      <div class="leak-header-left">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--blue)">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="2" y1="12" x2="22" y2="12"/>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        流媒体 &amp; 网络解锁检测
+      </div>
+      <button class="btn-leak" id="unlockBtn" onclick="runUnlockTest()">开始检测</button>
+    </div>
+    <div id="unlockBody" style="display:none">
+      <div class="unlock-grid" id="unlockGrid"></div>
+      <div id="unlockCachedHint" class="unlock-cached" style="display:none"></div>
+      <div class="unlock-note">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        检测基于服务器出口 IP，适合将 NetTrace 部署在代理/VPN 节点上的场景
+      </div>
     </div>
   </div>
 
@@ -1072,6 +1235,10 @@ async function runDetect() {
   const img = new Image();
   img.src = `http://${token}.${DOMAIN}/probe.png?t=${Date.now()}`;
 
+  // ── WebRTC 泄漏检测（与 DNS 轮询并行） ──────────────────────
+  // clientIP 在 DNS 轮询结束后才确定，先用空串占位，渲染时再对比
+  const webrtcPromise = detectWebRTCLeaks(null);
+
   // ── 轮询等待 DNS 捕获结果 ────────────────────────────────────
   let data = null;
   const deadline = Date.now() + DNS_TIMEOUT_MS;
@@ -1108,6 +1275,15 @@ async function runDetect() {
   // ── 停止计时，进度条推满 ─────────────────────────────────────
   clearInterval(timerInterval);
   document.getElementById('progressBar').style.width = '100%';
+
+  // ── 等待 WebRTC 检测完成，用真实 clientIP 做泄漏对比 ────────
+  const webrtcResult = await webrtcPromise;
+  const clientIPForWebRTC = data ? data.client_ip : null;
+  // 重新过滤：把已知 clientIP 从 leaked 中去掉（未泄漏则不报警）
+  if (webrtcResult && clientIPForWebRTC) {
+    webrtcResult.leaked = webrtcResult.leaked.filter(ip => ip !== clientIPForWebRTC);
+  }
+  renderWebRTCResult(webrtcResult, clientIPForWebRTC);
 
   // ── 渲染结果 ─────────────────────────────────────────────────
   if (!data) {
@@ -1154,8 +1330,9 @@ async function runDetect() {
   // 渲染卡片内详情行
   renderCardDetails(data);
 
-  // 主检测完成后显示泄漏检测入口
+  // 主检测完成后显示各检测入口
   document.getElementById('leakSection').style.display = 'block';
+  document.getElementById('unlockSection').style.display = 'block';
 
   finalize();
 }
@@ -1217,6 +1394,93 @@ function buildRows(pairs) {
 function finalize() {
   document.getElementById('refreshBtn').disabled = false;
   document.getElementById('refreshIcon').classList.remove('spin');
+}
+
+// ─────────────────────────────────────────────────────────────────
+// WebRTC 泄漏检测
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * detectWebRTCLeaks — 通过 STUN 收集 ICE candidate 中暴露的 IP
+ * 返回 { local: [...], leaked: [...] } 或 null（浏览器不支持）
+ * leaked = 公网 IP 且与 serverClientIP 不一致
+ */
+async function detectWebRTCLeaks(serverClientIP) {
+  if (!window.RTCPeerConnection) return null;
+  const ips = new Set();
+
+  return new Promise(resolve => {
+    let pc;
+    try {
+      pc = new RTCPeerConnection({ iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ]});
+    } catch (e) { resolve(null); return; }
+
+    pc.createDataChannel('');
+
+    const finish = () => {
+      try { pc.close(); } catch (_) {}
+      const local = [], leaked = [];
+      for (const ip of ips) {
+        if (isPrivateIP(ip)) local.push(ip);
+        else if (ip !== serverClientIP) leaked.push(ip);
+      }
+      resolve({ local, leaked });
+    };
+
+    const timer = setTimeout(finish, 5000);
+    pc.onicecandidate = e => {
+      if (!e.candidate) { clearTimeout(timer); finish(); return; }
+      // ICE candidate 格式: "candidate:xxx 1 udp xxx IP PORT typ ..."
+      const parts = e.candidate.candidate.split(' ');
+      if (parts.length >= 5 && parts[4] !== '0.0.0.0') ips.add(parts[4]);
+    };
+    pc.createOffer()
+      .then(o => pc.setLocalDescription(o))
+      .catch(() => { clearTimeout(timer); finish(); });
+  });
+}
+
+function isPrivateIP(ip) {
+  return /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|::1$|fe80|fc[0-9a-f]{2}:|fd)/i.test(ip);
+}
+
+/** 将 WebRTC 检测结果渲染到 webrtcRow */
+function renderWebRTCResult(result, serverClientIP) {
+  const row    = document.getElementById('webrtcRow');
+  const icon   = document.getElementById('webrtcIcon');
+  const status = document.getElementById('webrtcStatus');
+  const ipsEl  = document.getElementById('webrtcIPs');
+
+  row.style.display = 'flex';
+
+  if (result === null) {
+    status.textContent = 'WebRTC 已禁用（良好的隐私配置）';
+    ipsEl.innerHTML = '';
+    return;
+  }
+
+  const { local, leaked } = result;
+  let tags = '';
+
+  if (leaked.length > 0) {
+    icon.classList.add('warn');
+    status.textContent = `⚠ 检测到 ${leaked.length} 个泄漏 IP（与服务器报告不一致）`;
+    leaked.forEach(ip => {
+      tags += `<span class="webrtc-ip-tag leaked">${ip}</span>`;
+    });
+  } else {
+    status.textContent = '未检测到 WebRTC 公网 IP 泄漏';
+  }
+
+  local.forEach(ip => {
+    tags += `<span class="webrtc-ip-tag">${ip}</span>`;
+  });
+
+  if (!tags) tags = '<span style="font-size:11px;color:var(--text-muted)">无本地/公网 IP 暴露</span>';
+  ipsEl.innerHTML = tags;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1346,6 +1610,73 @@ function renderLeakResult(data) {
     </div>
     ${resolversHTML}
   `;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 流媒体解锁检测
+// ─────────────────────────────────────────────────────────────────
+
+async function runUnlockTest(forceRefresh = false) {
+  const btn  = document.getElementById('unlockBtn');
+  const body = document.getElementById('unlockBody');
+  const grid = document.getElementById('unlockGrid');
+  const hint = document.getElementById('unlockCachedHint');
+
+  btn.disabled = true;
+  btn.textContent = '检测中…';
+  body.style.display = 'block';
+  hint.style.display = 'none';
+
+  // 先渲染骨架占位
+  grid.innerHTML = Array(8).fill(0).map(() => `
+    <div class="unlock-card">
+      <div class="unlock-svc"><div class="skeleton h-sm" style="width:70%;height:14px"></div></div>
+      <div class="unlock-status"><div class="unlock-dot loading"></div><span>检测中</span></div>
+    </div>`).join('');
+
+  try {
+    const url = `/api/unlock${forceRefresh ? '?refresh=1' : ''}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    renderUnlockGrid(data.results);
+
+    if (data.cached && data.checked_at) {
+      const t = new Date(data.checked_at);
+      hint.textContent = `缓存于 ${t.toLocaleTimeString()}`;
+      hint.style.display = 'block';
+    }
+    btn.textContent = '刷新检测';
+    btn.onclick = () => runUnlockTest(true);
+  } catch (e) {
+    grid.innerHTML = `<div style="grid-column:1/-1;font-size:12px;color:var(--red);padding:4px 0">请求失败：${e.message}</div>`;
+    btn.textContent = '重试';
+  }
+  btn.disabled = false;
+}
+
+function renderUnlockGrid(results) {
+  if (!results || results.length === 0) return;
+  const grid = document.getElementById('unlockGrid');
+  grid.innerHTML = results.map(r => {
+    let dotClass, statusText;
+    if (r.available) {
+      dotClass   = 'ok';
+      statusText = r.region || '可访问';
+    } else if (r.note === '连接超时') {
+      dotClass   = 'timeout';
+      statusText = '连接超时';
+    } else {
+      dotClass   = 'fail';
+      statusText = r.note || '不可用';
+    }
+    return `<div class="unlock-card ${r.available ? 'ok' : 'fail'} fade-in">
+      <div class="unlock-svc">${r.service}</div>
+      <div class="unlock-status">
+        <div class="unlock-dot ${dotClass}"></div>
+        <span>${statusText}</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // 页面加载完成后自动开始检测
