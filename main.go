@@ -964,20 +964,27 @@ type WebServer struct {
 	geoCache *GeoCache
 }
 
+// getClientIP 从请求中提取真实客户端 IP，兼容反代。
+func getClientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		return strings.TrimSpace(strings.SplitN(xff, ",", 2)[0])
+	}
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+	if h, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return h
+	}
+	return r.RemoteAddr
+}
+
 // handleInfo 处理 /api/info?token=xxx。
 // token 首次命中后立即从 Store 删除，防止重复消费。
 func (w *WebServer) handleInfo(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Access-Control-Allow-Origin", "*")
 	rw.Header().Set("Content-Type", "application/json")
 
-	clientIP := r.RemoteAddr
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		clientIP = strings.TrimSpace(strings.SplitN(xff, ",", 2)[0])
-	} else if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		clientIP = xri
-	} else if h, _, err := net.SplitHostPort(clientIP); err == nil {
-		clientIP = h
-	}
+	clientIP := getClientIP(r)
 
 	token := r.URL.Query().Get("token")
 	resp := InfoResponse{ClientIP: clientIP, Token: token}
@@ -1036,6 +1043,31 @@ func (w *WebServer) handleProbe(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "image/png")
 	rw.Header().Set("Cache-Control", "no-store")
 	rw.Write(png)
+}
+
+// handleGeo 查询任意 IP 的地理归属，返回 GeoInfo JSON。
+// GET /api/geo?ip=1.2.3.4
+func (w *WebServer) handleGeo(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+	rw.Header().Set("Access-Control-Allow-Origin", "*")
+
+	ip := r.URL.Query().Get("ip")
+	if ip == "" {
+		ip = getClientIP(r)
+	}
+	if net.ParseIP(ip) == nil {
+		rw.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(rw).Encode(map[string]string{"error": "ip 格式无效"})
+		return
+	}
+
+	info, err := getGeoInfoCached(ip, w.geoCache)
+	if err != nil {
+		rw.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(rw).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	json.NewEncoder(rw).Encode(info)
 }
 
 // handleStats 返回运行状态（建议生产环境加 IP 鉴权）。
@@ -1105,6 +1137,7 @@ func main() {
 	mux.HandleFunc("/api/info", webServer.handleInfo)
 	mux.HandleFunc("/probe.png", webServer.handleProbe)
 	mux.HandleFunc("/api/stats", webServer.handleStats)
+	mux.HandleFunc("/api/geo", webServer.handleGeo)
 
 	logger.Info("HTTP 开始监听 %s", cfg.WebPort)
 	if err := http.ListenAndServe(cfg.WebPort, mux); err != nil {
