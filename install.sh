@@ -75,6 +75,12 @@ LOG_LEVEL="${LOG_LEVEL:-info}"
 [[ -n "$DNS_DOMAIN" ]] || error "DNS_DOMAIN 不能为空"
 [[ -n "$NS_IP" ]]     || error "NS_IP 不能为空"
 
+# ── 停止已有服务（避免 Text file busy）──────────────────────
+if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+  info "停止已有服务..."
+  systemctl stop "$SERVICE_NAME"
+fi
+
 # ── 安装文件 ──────────────────────────────────────────────
 info "安装到 $INSTALL_DIR ..."
 mkdir -p "$INSTALL_DIR"
