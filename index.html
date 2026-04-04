@@ -522,6 +522,147 @@
   /* ── 工具 ── */
   .fade-in { animation: fadeIn 0.35s ease forwards; opacity: 0; }
   @keyframes fadeIn { to { opacity: 1; } }
+
+  /* ── DNS 泄漏检测区块 ── */
+  .leak-section {
+    margin-top: 24px;
+    border: 1px solid var(--border-muted);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .leak-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 13px 18px;
+    background: var(--surface);
+  }
+  .leak-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .btn-leak {
+    padding: 6px 16px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+    font-size: 12px;
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+    flex-shrink: 0;
+  }
+  .btn-leak:hover:not(:disabled) {
+    border-color: var(--purple);
+    color: var(--purple);
+    background: rgba(188,140,255,0.06);
+  }
+  .btn-leak:disabled { opacity: 0.4; cursor: not-allowed; }
+  .leak-body {
+    padding: 16px 18px 18px;
+    background: var(--bg);
+    border-top: 1px solid var(--border-muted);
+  }
+  /* 进度行 */
+  .leak-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+  .leak-progress-bar-wrap {
+    flex: 1;
+    height: 3px;
+    background: var(--border-muted);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .leak-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--purple), var(--blue));
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+  /* 结果标识 */
+  .leak-result-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 14px;
+  }
+  .leak-result-badge.safe {
+    background: rgba(63,185,80,0.08);
+    border: 1px solid rgba(63,185,80,0.3);
+    color: var(--green);
+  }
+  .leak-result-badge.leaked {
+    background: rgba(248,81,73,0.08);
+    border: 1px solid rgba(248,81,73,0.3);
+    color: var(--red);
+  }
+  .leak-result-badge.partial {
+    background: rgba(227,179,65,0.08);
+    border: 1px solid rgba(227,179,65,0.3);
+    color: var(--yellow);
+  }
+  /* 解析器列表 */
+  .leak-resolvers {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .leak-resolver-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .leak-resolver-idx {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .leak-resolver-info { flex: 1; min-width: 0; }
+  .leak-resolver-ip {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--purple);
+    font-weight: 500;
+    margin-bottom: 5px;
+    word-break: break-all;
+  }
+  .leak-no-capture {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 8px 0;
+    text-align: center;
+  }
 </style>
 </head>
 <body>
@@ -640,6 +781,31 @@
     </svg>
     重新检测
   </button>
+
+  <!-- ── DNS 泄漏检测 ── -->
+  <div class="leak-section" id="leakSection" style="display:none">
+    <div class="leak-header">
+      <div class="leak-header-left">
+        <!-- 盾牌图标 -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--purple)">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        DNS 泄漏检测
+      </div>
+      <button class="btn-leak" id="leakBtn" onclick="runLeakTest()">开始检测</button>
+    </div>
+    <div class="leak-body" id="leakBody" style="display:none">
+      <!-- 进度条（检测中显示） -->
+      <div class="leak-progress" id="leakProgress" style="display:none">
+        <span id="leakProgressText">探测中 0/5</span>
+        <div class="leak-progress-bar-wrap">
+          <div class="leak-progress-bar" id="leakProgressBar"></div>
+        </div>
+      </div>
+      <!-- 结果区 -->
+      <div id="leakResult"></div>
+    </div>
+  </div>
 
   <!-- ── 工作原理（折叠） ── -->
   <div class="principle">
@@ -988,6 +1154,9 @@ async function runDetect() {
   // 渲染卡片内详情行
   renderCardDetails(data);
 
+  // 主检测完成后显示泄漏检测入口
+  document.getElementById('leakSection').style.display = 'block';
+
   finalize();
 }
 
@@ -1048,6 +1217,135 @@ function buildRows(pairs) {
 function finalize() {
   document.getElementById('refreshBtn').disabled = false;
   document.getElementById('refreshIcon').classList.remove('spin');
+}
+
+// ─────────────────────────────────────────────────────────────────
+// DNS 泄漏检测
+// ─────────────────────────────────────────────────────────────────
+
+const LEAK_PROBE_COUNT = 5;       // 并发探针数量
+const LEAK_TIMEOUT_MS  = 10000;   // 总超时（ms）
+
+async function runLeakTest() {
+  const btn = document.getElementById('leakBtn');
+  btn.disabled = true;
+  btn.textContent = '检测中…';
+
+  const body     = document.getElementById('leakBody');
+  const progress = document.getElementById('leakProgress');
+  const progText = document.getElementById('leakProgressText');
+  const progBar  = document.getElementById('leakProgressBar');
+  const result   = document.getElementById('leakResult');
+
+  body.style.display     = 'block';
+  progress.style.display = 'flex';
+  result.innerHTML       = '';
+  progBar.style.width    = '0%';
+  progText.textContent   = `探测中 0/${LEAK_PROBE_COUNT}`;
+
+  // 生成 N 个 token 并同时触发 DNS 查询
+  const tokens = Array.from({ length: LEAK_PROBE_COUNT }, () => randToken());
+  tokens.forEach(t => {
+    const img = new Image();
+    img.src = `http://${t}.${DOMAIN}/probe.png?t=${Date.now()}`;
+  });
+
+  // 轮询直到全部捕获或超时
+  const deadline = Date.now() + LEAK_TIMEOUT_MS;
+  let data = null;
+
+  await sleep(600);
+
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`/api/leak?tokens=${tokens.join(',')}`);
+      data = await res.json();
+
+      const pct = (data.captured_count / LEAK_PROBE_COUNT) * 100;
+      progBar.style.width = pct + '%';
+      progText.textContent = `探测中 ${data.captured_count}/${LEAK_PROBE_COUNT}`;
+
+      if (data.captured_count >= LEAK_PROBE_COUNT) break;
+    } catch (e) {
+      console.warn('[leak poll] error:', e);
+    }
+
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await sleep(Math.min(800, remaining));
+  }
+
+  // 清理服务端 token（fire-and-forget）
+  fetch(`/api/leak?tokens=${tokens.join(',')}`, { method: 'DELETE' }).catch(() => {});
+
+  // 渲染结果
+  renderLeakResult(data);
+
+  progress.style.display = 'none';
+  btn.disabled = false;
+  btn.textContent = '重新检测';
+}
+
+/** 渲染泄漏检测结果 */
+function renderLeakResult(data) {
+  const el = document.getElementById('leakResult');
+  if (!data) {
+    el.innerHTML = `<div class="leak-no-capture">请求失败，请稍后重试</div>`;
+    return;
+  }
+
+  const captured = data.captured_count;
+  const total    = data.total_count;
+  const unique   = data.unique_resolvers || [];
+
+  let badgeClass, badgeIcon, badgeText;
+  if (captured === 0) {
+    badgeClass = 'partial';
+    badgeIcon  = '⚠';
+    badgeText  = `未能捕获任何探针（可能启用了 DoH）`;
+  } else if (data.leaked) {
+    badgeClass = 'leaked';
+    badgeIcon  = '✕';
+    badgeText  = `检测到 ${unique.length} 个不同 DNS 解析器，存在泄漏风险`;
+  } else if (captured < total) {
+    badgeClass = 'partial';
+    badgeIcon  = '△';
+    badgeText  = `仅捕获 ${captured}/${total} 个探针，结果不完整`;
+  } else {
+    badgeClass = 'safe';
+    badgeIcon  = '✓';
+    badgeText  = `所有探针均通过同一 DNS 解析器，未发现泄漏`;
+  }
+
+  let resolversHTML = '';
+  if (unique.length > 0) {
+    resolversHTML = `<div class="leak-resolvers">` +
+      unique.map((ip, i) => {
+        const result = data.results.find(r => r.resolver_ip === ip);
+        const geo = result && result.resolver_geo;
+        const tags = geo ? geoToTags(geo).map(t =>
+          `<span class="tag ${t.cls}">${t.text}</span>`
+        ).join('') : '';
+        return `<div class="leak-resolver-item">
+          <div class="leak-resolver-idx">${i + 1}</div>
+          <div class="leak-resolver-info">
+            <div class="leak-resolver-ip">${ip}</div>
+            <div class="tags" style="min-height:unset">${tags}</div>
+          </div>
+        </div>`;
+      }).join('') +
+    `</div>`;
+  } else {
+    resolversHTML = `<div class="leak-no-capture">未捕获到任何 DNS 解析器 IP</div>`;
+  }
+
+  el.innerHTML = `
+    <div class="leak-result-badge ${badgeClass} fade-in">
+      <span>${badgeIcon}</span>
+      <span>${badgeText}</span>
+    </div>
+    ${resolversHTML}
+  `;
 }
 
 // 页面加载完成后自动开始检测
