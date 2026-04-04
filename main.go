@@ -1176,6 +1176,203 @@ func (w *WebServer) handleLeak(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(resp)
 }
 
+// ══════════════════════════════════════════════════════════
+//  流媒体解锁检测
+// ══════════════════════════════════════════════════════════
+
+// UnlockResult 记录单个服务的解锁状态。
+type UnlockResult struct {
+	Service   string `json:"service"`
+	Available bool   `json:"available"`
+	Region    string `json:"region,omitempty"`
+	Note      string `json:"note,omitempty"`
+}
+
+// unlockHTTPClient 是解锁检测专用 HTTP 客户端，独立超时、限制重定向次数。
+var unlockHTTPClient = &http.Client{
+	Timeout: 9 * time.Second,
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 5 {
+			return http.ErrUseLastResponse
+		}
+		return nil
+	},
+}
+
+// 解锁检测结果缓存（服务器 IP 几乎不变，5 分钟内复用）
+var (
+	unlockCacheMu   sync.RWMutex
+	unlockCacheData []UnlockResult
+	unlockCachedAt  time.Time
+)
+
+const unlockCacheTTL = 5 * time.Minute
+
+type streamServiceDef struct {
+	name    string
+	url     string
+	checkFn func(status int, finalURL, body string) (available bool, region, note string)
+}
+
+// streamServiceList 是所有待检测服务的定义列表。
+var streamServiceList = []streamServiceDef{
+	{
+		name: "Netflix",
+		url:  "https://www.netflix.com/title/80018499",
+		checkFn: func(status int, finalURL, body string) (bool, string, string) {
+			if status == 200 && strings.Contains(finalURL, "/title/") {
+				return true, "", ""
+			}
+			if strings.Contains(body, "not available") || strings.Contains(body, "unavailable in your") {
+				return false, "", "地区不可用"
+			}
+			return false, "", fmt.Sprintf("HTTP %d", status)
+		},
+	},
+	{
+		name: "YouTube",
+		url:  "https://www.youtube.com/",
+		checkFn: func(status int, finalURL, body string) (bool, string, string) {
+			return status == 200, "", ""
+		},
+	},
+	{
+		name: "Disney+",
+		url:  "https://www.disneyplus.com/",
+		checkFn: func(status int, finalURL, body string) (bool, string, string) {
+			if status == 200 {
+				if strings.Contains(body, "not available") || strings.Contains(body, "coming soon") {
+					return false, "", "地区不可用"
+				}
+				return true, "", ""
+			}
+			if status == 403 || status == 451 {
+				return false, "", "地区封锁"
+			}
+			return false, "", fmt.Sprintf("HTTP %d", status)
+		},
+	},
+	{
+		name: "ChatGPT",
+		url:  "https://chatgpt.com/",
+		checkFn: func(status int, finalURL, body string) (bool, string, string) {
+			if status == 200 {
+				return true, "", ""
+			}
+			if status == 403 || status == 451 {
+				return false, "", "地区封锁"
+			}
+			return false, "", fmt.Sprintf("HTTP %d", status)
+		},
+	},
+	{
+		name: "Spotify",
+		url:  "https://open.spotify.com/",
+		checkFn: func(status int, finalURL, body string) (bool, string, string) {
+			return status == 200, "", ""
+		},
+	},
+	{
+		name: "TikTok",
+		url:  "https://www.tiktok.com/",
+		checkFn: func(status int, finalURL, body string) (bool, string, string) {
+			return status == 200, "", ""
+		},
+	},
+	{
+		name: "Twitter/X",
+		url:  "https://x.com/",
+		checkFn: func(status int, finalURL, body string) (bool, string, string) {
+			return status == 200, "", ""
+		},
+	},
+	{
+		name: "GitHub",
+		url:  "https://github.com/",
+		checkFn: func(status int, finalURL, body string) (bool, string, string) {
+			return status == 200, "", ""
+		},
+	},
+}
+
+// doUnlockChecks 并发检测所有服务，按定义顺序返回结果。
+func doUnlockChecks() []UnlockResult {
+	results := make([]UnlockResult, len(streamServiceList))
+	var wg sync.WaitGroup
+
+	for i, svc := range streamServiceList {
+		wg.Add(1)
+		go func(idx int, s streamServiceDef) {
+			defer wg.Done()
+			result := UnlockResult{Service: s.name}
+
+			req, err := http.NewRequest("GET", s.url, nil)
+			if err != nil {
+				result.Note = "请求构建失败"
+				results[idx] = result
+				return
+			}
+			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+			req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+			req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+
+			resp, err := unlockHTTPClient.Do(req)
+			if err != nil {
+				result.Note = "连接超时"
+				results[idx] = result
+				return
+			}
+			defer resp.Body.Close()
+
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
+			result.Available, result.Region, result.Note = s.checkFn(
+				resp.StatusCode, resp.Request.URL.String(), string(body),
+			)
+			results[idx] = result
+		}(i, svc)
+	}
+	wg.Wait()
+	return results
+}
+
+// handleUnlock 返回流媒体解锁检测结果，命中缓存时直接返回，?refresh=1 强制刷新。
+// GET /api/unlock
+func (w *WebServer) handleUnlock(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+	rw.Header().Set("Access-Control-Allow-Origin", "*")
+
+	forceRefresh := r.URL.Query().Get("refresh") == "1"
+
+	unlockCacheMu.RLock()
+	cacheHit := unlockCacheData != nil && !forceRefresh && time.Since(unlockCachedAt) < unlockCacheTTL
+	unlockCacheMu.RUnlock()
+
+	if cacheHit {
+		unlockCacheMu.RLock()
+		defer unlockCacheMu.RUnlock()
+		json.NewEncoder(rw).Encode(map[string]any{
+			"results":    unlockCacheData,
+			"checked_at": unlockCachedAt.Format(time.RFC3339),
+			"cached":     true,
+		})
+		return
+	}
+
+	logger.Info("流媒体解锁检测开始，来自 %s", getClientIP(r))
+	results := doUnlockChecks()
+
+	unlockCacheMu.Lock()
+	unlockCacheData = results
+	unlockCachedAt = time.Now()
+	unlockCacheMu.Unlock()
+
+	json.NewEncoder(rw).Encode(map[string]any{
+		"results":    results,
+		"checked_at": unlockCachedAt.Format(time.RFC3339),
+		"cached":     false,
+	})
+}
+
 // handleStats 返回运行状态（建议生产环境加 IP 鉴权）。
 func (w *WebServer) handleStats(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
@@ -1245,6 +1442,7 @@ func main() {
 	mux.HandleFunc("/api/stats", webServer.handleStats)
 	mux.HandleFunc("/api/geo", webServer.handleGeo)
 	mux.HandleFunc("/api/leak", webServer.handleLeak)
+	mux.HandleFunc("/api/unlock", webServer.handleUnlock)
 
 	logger.Info("HTTP 开始监听 %s", cfg.WebPort)
 	if err := http.ListenAndServe(cfg.WebPort, mux); err != nil {
