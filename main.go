@@ -979,6 +979,183 @@ func isPrivateIP(s string) bool {
 }
 
 // ══════════════════════════════════════════════════════════
+//  IP 类型识别
+// ══════════════════════════════════════════════════════════
+
+type IPTypeResult struct {
+	IP      string   `json:"ip"`
+	Type    string   `json:"type"`
+	TypeCN  string   `json:"type_cn"`
+	Score   int      `json:"score"`
+	Reasons []string `json:"reasons"`
+	ASN     uint     `json:"asn"`
+	ASNOrg  string   `json:"asn_org"`
+	PTR     string   `json:"ptr"`
+	Country string   `json:"country"`
+	City    string   `json:"city"`
+}
+
+// 已知机房/云服务商 ASN
+var datacenterASNs = map[uint]string{
+	13335: "Cloudflare", 14618: "Amazon/AWS", 16509: "Amazon/AWS",
+	15169: "Google Cloud", 396982: "Google Cloud", 8075: "Microsoft/Azure",
+	63949: "Linode/Akamai", 20473: "Vultr/Choopa", 24940: "Hetzner",
+	16276: "OVH", 14061: "DigitalOcean", 46606: "Unified Layer",
+	36352: "ColoCrossing", 55286: "B2 Net/ServerMania", 62567: "DigitalOcean",
+	19871: "Network Solutions", 30633: "Leaseweb", 60781: "Leaseweb",
+	131199: "Alibaba Cloud", 45102: "Alibaba Cloud", 37963: "Alibaba Cloud",
+	55960: "Tencent Cloud", 132203: "Tencent Cloud", 45090: "Tencent Cloud",
+	38365: "Baidu Cloud", 58466: "Chinanet Hosting",
+	51167: "Contabo", 211680: "Contabo", 4785: "xTom",
+	142400: "Purple Communications", 399486: "Oracle Cloud",
+	31898: "Oracle Cloud", 36351: "SoftLayer/IBM", 36444: "GigeNET",
+	33438: "Highwinds/StackPath", 209242: "Cloudflare",
+	8560: "IONOS/1&1", 197540: "Netcup",
+}
+
+// 已知 VPN/代理服务商 ASN
+var vpnASNs = map[uint]string{
+	9009: "M247 (NordVPN/ExpressVPN)", 212238: "Datacamp (VPN)",
+	206092: "Ipax (VPN)", 44592: "SkyLink (VPN)", 62240: "Clouvider (VPN)",
+	51852: "Private Layer", 49981: "WorldStream (VPN)",
+	174: "Cogent (Proxy)", 49544: "i3D.net (VPN)",
+	212815: "Zenlayer (Proxy)", 6939: "Hurricane Electric (Tunnel)",
+}
+
+// 关键词匹配用于识别 IP 类型
+var datacenterKeywords = []string{
+	"hosting", "server", "cloud", "data center", "datacenter", "colocation",
+	"dedicated", "vps", "hetzner", "ovh", "amazon", "google", "microsoft",
+	"azure", "digitalocean", "vultr", "linode", "rackspace", "softlayer",
+	"阿里云", "腾讯云", "华为云", "百度云", "ucloud",
+}
+
+var vpnKeywords = []string{
+	"vpn", "proxy", "tunnel", "private internet", "mullvad", "surfshark",
+	"expressvpn", "nordvpn", "cyberghost", "protonvpn", "anonymizer",
+	"hide.me", "pia", "purevpn",
+}
+
+var mobileKeywords = []string{
+	"mobile", "cellular", "wireless", "4g", "5g", "lte",
+	"中国移动", "中国联通", "中国电信", "china mobile", "china unicom", "china telecom",
+	"t-mobile", "verizon wireless", "at&t mobility",
+}
+
+func classifyIPType(geo *GeoInfo) IPTypeResult {
+	result := IPTypeResult{
+		IP:      geo.Query,
+		ASN:     geo.ASN,
+		ASNOrg:  geo.ASNOrg,
+		Country: geo.Country,
+		City:    geo.City,
+		Score:   80, // 默认中等质量
+	}
+
+	orgLower := strings.ToLower(geo.ASNOrg)
+	ispLower := strings.ToLower(geo.ISP)
+
+	// PTR 反向解析
+	names, err := net.LookupAddr(geo.Query)
+	if err == nil && len(names) > 0 {
+		result.PTR = strings.TrimSuffix(names[0], ".")
+	}
+
+	// 1. 检查已知 ASN
+	if provider, ok := datacenterASNs[geo.ASN]; ok {
+		result.Type = "datacenter"
+		result.TypeCN = "机房/云服务器"
+		result.Score = 20
+		result.Reasons = append(result.Reasons, fmt.Sprintf("ASN %d 属于已知云服务商: %s", geo.ASN, provider))
+	} else if provider, ok := vpnASNs[geo.ASN]; ok {
+		result.Type = "vpn"
+		result.TypeCN = "VPN/代理"
+		result.Score = 15
+		result.Reasons = append(result.Reasons, fmt.Sprintf("ASN %d 属于已知 VPN/代理服务商: %s", geo.ASN, provider))
+	}
+
+	// 2. 关键词匹配（如果 ASN 未匹配到）
+	if result.Type == "" {
+		for _, kw := range vpnKeywords {
+			if strings.Contains(orgLower, kw) || strings.Contains(ispLower, kw) {
+				result.Type = "vpn"
+				result.TypeCN = "VPN/代理"
+				result.Score = 25
+				result.Reasons = append(result.Reasons, fmt.Sprintf("ISP/组织名包含关键词: %s", kw))
+				break
+			}
+		}
+	}
+	if result.Type == "" {
+		for _, kw := range datacenterKeywords {
+			if strings.Contains(orgLower, kw) || strings.Contains(ispLower, kw) {
+				result.Type = "datacenter"
+				result.TypeCN = "机房/云服务器"
+				result.Score = 30
+				result.Reasons = append(result.Reasons, fmt.Sprintf("ISP/组织名包含关键词: %s", kw))
+				break
+			}
+		}
+	}
+	if result.Type == "" {
+		for _, kw := range mobileKeywords {
+			if strings.Contains(orgLower, kw) || strings.Contains(ispLower, kw) {
+				result.Type = "mobile"
+				result.TypeCN = "移动蜂窝网络"
+				result.Score = 70
+				result.Reasons = append(result.Reasons, fmt.Sprintf("ISP/组织名包含关键词: %s", kw))
+				break
+			}
+		}
+	}
+
+	// 3. PTR 分析
+	if result.PTR != "" {
+		ptrLower := strings.ToLower(result.PTR)
+		result.Reasons = append(result.Reasons, fmt.Sprintf("PTR 记录: %s", result.PTR))
+		if result.Type == "" {
+			// PTR 包含 static/residential 通常是住宅 IP
+			for _, kw := range []string{"static", "residential", "dsl", "cable", "broadband", "fiber", "fttx", "pppoe", "adsl"} {
+				if strings.Contains(ptrLower, kw) {
+					result.Type = "residential"
+					result.TypeCN = "住宅/宽带"
+					result.Score = 90
+					result.Reasons = append(result.Reasons, "PTR 记录包含宽带/住宅特征")
+					break
+				}
+			}
+		}
+		if result.Type == "datacenter" || result.Type == "vpn" {
+			// 有 PTR 说明做了基本配置，略微加分
+			result.Score += 5
+		}
+	} else {
+		result.Reasons = append(result.Reasons, "无 PTR 反向 DNS 记录")
+		if result.Type == "" {
+			result.Score -= 10 // 无 PTR 降分
+		}
+	}
+
+	// 4. 默认分类
+	if result.Type == "" {
+		result.Type = "residential"
+		result.TypeCN = "住宅/宽带"
+		result.Score = 80
+		result.Reasons = append(result.Reasons, "未匹配到已知机房/VPN 特征，推测为住宅 IP")
+	}
+
+	// 分数边界
+	if result.Score < 0 {
+		result.Score = 0
+	}
+	if result.Score > 100 {
+		result.Score = 100
+	}
+
+	return result
+}
+
+// ══════════════════════════════════════════════════════════
 //  HTTP 服务器
 // ══════════════════════════════════════════════════════════
 
@@ -2018,9 +2195,21 @@ func (w *WebServer) handleHeaders(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(resp)
 }
 
-// ══════════════════════════════════════════════════════════
-//  程序入口
-// ══════════════════════════════════════════════════════════
+// handleIPType 返回客户端 IP 的类型识别结果。
+func (w *WebServer) handleIPType(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Access-Control-Allow-Origin", "*")
+	rw.Header().Set("Content-Type", "application/json")
+
+	clientIP := getClientIP(r)
+	geo, err := getGeoInfoCached(clientIP, w.geoCache)
+	if err != nil {
+		rw.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(rw).Encode(map[string]string{"error": "GeoIP 查询失败"})
+		return
+	}
+	result := classifyIPType(geo)
+	json.NewEncoder(rw).Encode(result)
+}
 
 func main() {
 	cfg := buildConfig()
@@ -2079,6 +2268,7 @@ func main() {
 	mux.HandleFunc("/api/unlock", webServer.handleUnlock)
 	mux.HandleFunc("/api/trace", webServer.handleTrace)
 	mux.HandleFunc("/api/headers", webServer.handleHeaders)
+	mux.HandleFunc("/api/ip-type", webServer.handleIPType)
 	mux.HandleFunc("/api/dns-bench", webServer.handleDNSBench)
 
 	logger.Info("HTTP 开始监听 %s", cfg.WebPort)

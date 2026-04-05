@@ -1425,6 +1425,122 @@
     margin-top: 12px;
     line-height: 1.5;
   }
+  /* ── IP 类型识别 ── */
+  .iptype-section {
+    margin-top: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .iptype-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+  }
+  .iptype-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .btn-iptype {
+    font-size: 12px;
+    padding: 5px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .btn-iptype:hover:not(:disabled) { background: var(--bg); }
+  .btn-iptype:disabled { opacity: .5; cursor: default; }
+  .iptype-body {
+    padding: 0 18px 18px;
+  }
+  .iptype-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+  .iptype-badge .tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    color: #fff;
+  }
+  .iptype-badge .tag-residential { background: #22c55e; }
+  .iptype-badge .tag-datacenter  { background: #ef4444; }
+  .iptype-badge .tag-vpn         { background: #f59e0b; }
+  .iptype-badge .tag-mobile      { background: #3b82f6; }
+  .iptype-score-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--bg);
+    margin-bottom: 6px;
+    overflow: hidden;
+  }
+  .iptype-score-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width .6s ease;
+  }
+  .iptype-score-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+  .iptype-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 500px) {
+    .iptype-details { grid-template-columns: 1fr; }
+  }
+  .iptype-detail-item {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .iptype-detail-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 4px;
+  }
+  .iptype-detail-value {
+    font-size: 12px;
+    color: var(--text);
+    word-break: break-all;
+  }
+  .iptype-reasons {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .iptype-reasons li {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .iptype-reasons li:last-child { border-bottom: none; }
   /* ── DNS 基准测试 ── */
   .dnsbench-section {
     margin-top: 16px;
@@ -1990,6 +2106,20 @@
     </div>
   </div>
 
+  <!-- ── IP 类型识别 ── -->
+  <div class="iptype-section" id="iptypeSection" style="display:none">
+    <div class="iptype-header">
+      <div class="iptype-header-left">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--cyan)">
+          <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>
+        </svg>
+        IP 类型识别
+      </div>
+      <button class="btn-iptype" id="iptypeBtn" onclick="runIPTypeTest()">开始检测</button>
+    </div>
+    <div class="iptype-body" id="iptypeBody" style="display:none"></div>
+  </div>
+
   <!-- ── HTTP/浏览器指纹 ── -->
   <div class="fp-section" id="fpSection" style="display:none">
     <div class="fp-header">
@@ -2391,6 +2521,7 @@ async function runDetect() {
   document.getElementById('natSection').style.display = '';
   document.getElementById('speedSection').style.display = '';
   document.getElementById('fpSection').style.display = '';
+  document.getElementById('iptypeSection').style.display = '';
   document.getElementById('dnsbenchSection').style.display = '';
 
   finalize();
@@ -3147,6 +3278,73 @@ function parseOS() {
   if (ua.includes('Linux')) return 'Linux';
   if (ua.includes('iPhone') || ua.includes('iPad')) return 'iOS';
   return '未知';
+}
+
+// ── IP 类型识别 ──
+async function runIPTypeTest() {
+  const btn = document.getElementById('iptypeBtn');
+  const body = document.getElementById('iptypeBody');
+  btn.disabled = true;
+  btn.textContent = '检测中…';
+  body.style.display = 'block';
+  body.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:4px 0">正在分析 IP 类型…</div>';
+
+  try {
+    const resp = await fetch('/api/ip-type', { cache: 'no-store' });
+    const d = await resp.json();
+    if (d.error) throw new Error(d.error);
+
+    const typeIcons = { residential: '🏠', datacenter: '🖥️', vpn: '🛡️', mobile: '📱' };
+    const typeColors = { residential: 'tag-residential', datacenter: 'tag-datacenter', vpn: 'tag-vpn', mobile: 'tag-mobile' };
+    const icon = typeIcons[d.type] || '❓';
+    const tagClass = typeColors[d.type] || '';
+
+    const scoreColor = d.score >= 70 ? '#22c55e' : d.score >= 40 ? '#f59e0b' : '#ef4444';
+    const scoreLabel = d.score >= 70 ? '优质 IP' : d.score >= 40 ? '一般' : '低质量 / 高风险';
+
+    let reasonsHTML = d.reasons.map(r => `<li><span style="color:var(--cyan)">▸</span> ${escapeHTML(r)}</li>`).join('');
+
+    body.innerHTML = `
+      <div class="iptype-badge">
+        ${icon} <span class="tag ${tagClass}">${escapeHTML(d.type_cn)}</span>
+      </div>
+      <div class="iptype-score-bar">
+        <div class="iptype-score-fill" style="width:${d.score}%;background:${scoreColor}"></div>
+      </div>
+      <div class="iptype-score-label">IP 质量评分: <strong>${d.score}/100</strong> — ${scoreLabel}</div>
+      <div class="iptype-details">
+        <div class="iptype-detail-item">
+          <div class="iptype-detail-label">IP 地址</div>
+          <div class="iptype-detail-value">${escapeHTML(d.ip)}</div>
+        </div>
+        <div class="iptype-detail-item">
+          <div class="iptype-detail-label">ASN</div>
+          <div class="iptype-detail-value">AS${d.asn} ${escapeHTML(d.asn_org)}</div>
+        </div>
+        <div class="iptype-detail-item">
+          <div class="iptype-detail-label">位置</div>
+          <div class="iptype-detail-value">${escapeHTML(d.country)}${d.city ? ' / ' + escapeHTML(d.city) : ''}</div>
+        </div>
+        <div class="iptype-detail-item">
+          <div class="iptype-detail-label">PTR 记录</div>
+          <div class="iptype-detail-value">${d.ptr ? escapeHTML(d.ptr) : '<span style="color:var(--text-muted)">无</span>'}</div>
+        </div>
+      </div>
+      <ul class="iptype-reasons">${reasonsHTML}</ul>
+    `;
+  } catch (e) {
+    body.innerHTML = `<div style="color:var(--red);font-size:12px">检测失败: ${escapeHTML(e.message)}</div>`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = '重新检测';
+}
+
+function escapeHTML(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
 }
 
 async function runFingerprintTest() {
