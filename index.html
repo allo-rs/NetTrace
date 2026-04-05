@@ -788,6 +788,150 @@
     padding: 8px 0;
     text-align: center;
   }
+
+  /* ── 路由追踪 ── */
+  .trace-section {
+    margin-top: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .trace-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    gap: 12px;
+  }
+  .trace-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--text-bright);
+  }
+  .trace-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .trace-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 5px 10px;
+    width: 180px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .trace-input:focus {
+    border-color: var(--blue);
+  }
+  .trace-input::placeholder {
+    color: var(--text-muted);
+  }
+  .btn-trace {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--green);
+    font-size: 12px;
+    padding: 5px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn-trace:hover:not(:disabled) {
+    background: rgba(63,185,80,0.08);
+    border-color: rgba(63,185,80,0.4);
+  }
+  .btn-trace:disabled { opacity: 0.4; cursor: not-allowed; }
+  .trace-body {
+    padding: 0 18px 16px;
+  }
+  .trace-status {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .trace-status .spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .trace-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .trace-table th {
+    text-align: left;
+    color: var(--text-muted);
+    font-weight: 500;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .trace-table td {
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--border-muted);
+    vertical-align: top;
+  }
+  .trace-table tr:last-child td {
+    border-bottom: none;
+  }
+  .trace-table tr.dest td {
+    color: var(--green);
+  }
+  .trace-table tr.timeout td {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .trace-hop-num {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    min-width: 28px;
+  }
+  .trace-hop-ip {
+    font-family: var(--font-mono);
+    color: var(--text-bright);
+  }
+  .trace-hop-rtt {
+    font-family: var(--font-mono);
+    color: var(--yellow);
+    white-space: nowrap;
+  }
+  .trace-hop-geo .tag {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+  .trace-error {
+    color: var(--red);
+    font-size: 12px;
+    padding: 8px 0;
+  }
+  .trace-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 10px;
+    line-height: 1.5;
+  }
 </style>
 </head>
 <body>
@@ -943,6 +1087,49 @@
       </div>
       <!-- 结果区 -->
       <div id="leakResult"></div>
+    </div>
+  </div>
+
+  <!-- ── 路由追踪 ── -->
+  <div class="trace-section" id="traceSection" style="display:none">
+    <div class="trace-header">
+      <div class="trace-header-left">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--green)">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        路由追踪
+      </div>
+      <div class="trace-input-row">
+        <input type="text" class="trace-input" id="traceTarget" placeholder="IP 或域名" spellcheck="false">
+        <button class="btn-trace" id="traceBtn" onclick="runTrace()">追踪</button>
+        <button class="btn-trace" id="traceClientBtn" onclick="traceToClient()" title="追踪到您的客户端 IP">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          追踪我
+        </button>
+      </div>
+    </div>
+    <div class="trace-body" id="traceBody" style="display:none">
+      <div class="trace-status" id="traceStatus"></div>
+      <table class="trace-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>IP 地址</th>
+            <th>延迟</th>
+            <th>归属地</th>
+          </tr>
+        </thead>
+        <tbody id="traceRows"></tbody>
+      </table>
+      <div class="trace-note" id="traceNote" style="display:none">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>路由追踪从服务端发起，显示的是服务器到目标 IP 的网络路径。部分云服务器可能屏蔽 ICMP，导致中间跳显示超时。</span>
+      </div>
     </div>
   </div>
 
@@ -1333,6 +1520,7 @@ async function runDetect() {
 
   // 主检测完成后显示各检测入口
   document.getElementById('leakSection').style.display = 'block';
+  document.getElementById('traceSection').style.display = '';
   document.getElementById('unlockSection').style.display = 'block';
 
   finalize();
@@ -1711,6 +1899,170 @@ function renderUnlockGrid(results) {
     </div>`;
   }).join('');
 }
+
+// ─────────────────────────────────────────────────────────────────
+// 路由追踪
+// ─────────────────────────────────────────────────────────────────
+
+let traceAbortCtrl = null;
+
+function traceToClient() {
+  const clientEl = document.getElementById('clientIP');
+  const ip = clientEl ? clientEl.textContent.trim() : '';
+  if (!ip || ip === '未知' || ip === '请求失败') {
+    alert('客户端 IP 尚未检测到，请等待检测完成');
+    return;
+  }
+  document.getElementById('traceTarget').value = ip;
+  runTrace();
+}
+
+async function runTrace() {
+  const input = document.getElementById('traceTarget');
+  const target = input.value.trim();
+  if (!target) {
+    input.focus();
+    return;
+  }
+
+  const btn = document.getElementById('traceBtn');
+  const clientBtn = document.getElementById('traceClientBtn');
+  const body = document.getElementById('traceBody');
+  const status = document.getElementById('traceStatus');
+  const rows = document.getElementById('traceRows');
+  const note = document.getElementById('traceNote');
+
+  // 如果正在追踪，先中止
+  if (traceAbortCtrl) {
+    traceAbortCtrl.abort();
+    traceAbortCtrl = null;
+  }
+
+  btn.disabled = true;
+  clientBtn.disabled = true;
+  btn.textContent = '追踪中…';
+  body.style.display = 'block';
+  rows.innerHTML = '';
+  note.style.display = 'none';
+  status.innerHTML = '<div class="spinner"></div> 正在追踪 ' + target + '…';
+
+  traceAbortCtrl = new AbortController();
+
+  try {
+    const resp = await fetch('/api/trace?target=' + encodeURIComponent(target), {
+      signal: traceAbortCtrl.signal
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      let msg = '请求失败';
+      try { msg = JSON.parse(err).error || msg; } catch(e) {}
+      status.innerHTML = '';
+      rows.innerHTML = `<tr><td colspan="4" class="trace-error">${msg}</td></tr>`;
+      btn.disabled = false;
+      clientBtn.disabled = false;
+      btn.textContent = '追踪';
+      return;
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let hopCount = 0;
+    let done = false;
+
+    while (!done) {
+      const { value, done: streamDone } = await reader.read();
+      if (streamDone) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // keep incomplete line
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const jsonStr = line.slice(6);
+        let data;
+        try { data = JSON.parse(jsonStr); } catch(e) { continue; }
+
+        if (data.done) {
+          // Final summary event
+          done = true;
+          if (data.error) {
+            status.innerHTML = '';
+            rows.innerHTML = `<tr><td colspan="4" class="trace-error">${data.error}</td></tr>`;
+          } else {
+            const totalHops = data.hops ? data.hops.length : hopCount;
+            const reached = data.hops && data.hops.some(h => h.is_dest);
+            status.innerHTML = reached
+              ? `✓ 追踪完成，共 ${totalHops} 跳，已到达目标 ${data.resolved_ip}`
+              : `✓ 追踪完成，共 ${totalHops} 跳（未到达目标）`;
+            status.style.color = reached ? 'var(--green)' : 'var(--yellow)';
+          }
+          break;
+        }
+
+        // It's a hop event
+        hopCount++;
+        const tr = document.createElement('tr');
+
+        if (data.timeout) {
+          tr.className = 'timeout';
+          tr.innerHTML = `
+            <td class="trace-hop-num">${data.hop}</td>
+            <td class="trace-hop-ip">*</td>
+            <td class="trace-hop-rtt">*</td>
+            <td class="trace-hop-geo"><span class="tag" style="opacity:0.5">超时</span></td>`;
+        } else {
+          if (data.is_dest) tr.className = 'dest';
+          const rttStr = data.rtts
+            .map(r => r < 0 ? '*' : r.toFixed(1) + 'ms')
+            .join(' / ');
+          const geoTags = data.geo ? geoToTags(data.geo) : [];
+          const geoHTML = geoTags.map(t => `<span class="tag ${t.cls}">${t.text}</span>`).join('');
+
+          tr.innerHTML = `
+            <td class="trace-hop-num">${data.hop}</td>
+            <td class="trace-hop-ip">${data.ip}${data.is_dest ? ' ★' : ''}</td>
+            <td class="trace-hop-rtt">${rttStr}</td>
+            <td class="trace-hop-geo">${geoHTML || '<span style="color:var(--text-muted)">—</span>'}</td>`;
+        }
+
+        rows.appendChild(tr);
+        // Auto-scroll to keep latest hop visible
+        tr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        // Update status with hop count
+        status.innerHTML = `<div class="spinner"></div> 正在追踪 ${target}… (${hopCount} 跳)`;
+      }
+    }
+
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      status.innerHTML = '追踪已取消';
+      status.style.color = 'var(--text-muted)';
+    } else {
+      status.innerHTML = '';
+      rows.innerHTML = `<tr><td colspan="4" class="trace-error">连接失败: ${e.message}</td></tr>`;
+    }
+  } finally {
+    note.style.display = 'flex';
+    btn.disabled = false;
+    clientBtn.disabled = false;
+    btn.textContent = '追踪';
+    traceAbortCtrl = null;
+  }
+}
+
+// 支持回车触发追踪
+document.addEventListener('DOMContentLoaded', () => {
+  const traceInput = document.getElementById('traceTarget');
+  if (traceInput) {
+    traceInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') runTrace();
+    });
+  }
+});
 
 // 页面加载完成后自动开始检测
 runDetect();
