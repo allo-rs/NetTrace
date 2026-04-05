@@ -1819,6 +1819,163 @@ func (w *WebServer) handleTrace(rw http.ResponseWriter, r *http.Request) {
 }
 
 // ══════════════════════════════════════════════════════════
+//  DNS 基准测试
+// ══════════════════════════════════════════════════════════
+
+// DNSBenchResolver 定义待测试的 DNS 解析器
+type DNSBenchResolver struct {
+	Name string `json:"name"`
+	IP   string `json:"ip"`
+}
+
+// DNSBenchResult 单个解析器的测试结果
+type DNSBenchResult struct {
+	Name   string    `json:"name"`
+	IP     string    `json:"ip"`
+	RTTs   []float64 `json:"rtts"`   // 每次查询的 RTT（毫秒），-1 表示超时
+	Min    float64   `json:"min"`    // 最小 RTT
+	Avg    float64   `json:"avg"`    // 平均 RTT
+	Max    float64   `json:"max"`    // 最大 RTT
+	Loss   int       `json:"loss"`   // 超时次数
+	Status string    `json:"status"` // ok / timeout / error
+}
+
+var defaultResolvers = []DNSBenchResolver{
+	{"Google", "8.8.8.8"},
+	{"Google 2nd", "8.8.4.4"},
+	{"Cloudflare", "1.1.1.1"},
+	{"Cloudflare 2nd", "1.0.0.1"},
+	{"Quad9", "9.9.9.9"},
+	{"OpenDNS", "208.67.222.222"},
+	{"DNSPod", "119.29.29.29"},
+	{"AliDNS", "223.5.5.5"},
+	{"114DNS", "114.114.114.114"},
+}
+
+// queryDNS 向指定解析器发送 A 记录查询并测量 RTT
+func queryDNS(resolver, domain string, timeout time.Duration) (float64, error) {
+	// 构造 DNS 查询报文
+	txID := uint16(rand.Intn(0xffff))
+	var buf []byte
+	// Header: ID, Flags(RD=1), QDCOUNT=1
+	buf = append(buf, byte(txID>>8), byte(txID))
+	buf = append(buf, 0x01, 0x00) // Flags: RD=1
+	buf = append(buf, 0x00, 0x01) // QDCOUNT=1
+	buf = append(buf, 0x00, 0x00) // ANCOUNT
+	buf = append(buf, 0x00, 0x00) // NSCOUNT
+	buf = append(buf, 0x00, 0x00) // ARCOUNT
+	// Question
+	buf = append(buf, encodeName(domain)...)
+	buf = append(buf, 0x00, 0x01) // QTYPE=A
+	buf = append(buf, 0x00, 0x01) // QCLASS=IN
+
+	addr := resolver + ":53"
+	conn, err := net.DialTimeout("udp", addr, timeout)
+	if err != nil {
+		return -1, err
+	}
+	defer conn.Close()
+
+	_ = conn.SetDeadline(time.Now().Add(timeout))
+
+	start := time.Now()
+	if _, err := conn.Write(buf); err != nil {
+		return -1, err
+	}
+
+	resp := make([]byte, 512)
+	if _, err := conn.Read(resp); err != nil {
+		return -1, err
+	}
+	rtt := float64(time.Since(start).Microseconds()) / 1000.0
+
+	return math.Round(rtt*100) / 100, nil
+}
+
+// handleDNSBench 处理 /api/dns-bench 请求，测试多个 DNS 解析器的响应速度
+func (w *WebServer) handleDNSBench(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Access-Control-Allow-Origin", "*")
+	rw.Header().Set("Content-Type", "text/event-stream")
+	rw.Header().Set("Cache-Control", "no-cache")
+	rw.Header().Set("Connection", "keep-alive")
+
+	flusher, ok := rw.(http.Flusher)
+	if !ok {
+		http.Error(rw, `{"error":"streaming not supported"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// 速率限制
+	clientIP := getClientIP(r)
+	if !w.traceRL.Allow(clientIP) {
+		http.Error(rw, `{"error":"rate limit exceeded"}`, http.StatusTooManyRequests)
+		return
+	}
+
+	domain := "google.com"
+	probes := 3
+	timeout := 3 * time.Second
+
+	logger.Info("dns-bench: 客户端 %s 发起 DNS 基准测试", clientIP)
+
+	for _, resolver := range defaultResolvers {
+		select {
+		case <-r.Context().Done():
+			return
+		default:
+		}
+
+		result := DNSBenchResult{
+			Name: resolver.Name,
+			IP:   resolver.IP,
+			RTTs: make([]float64, probes),
+		}
+
+		var sum float64
+		var cnt int
+		result.Min = math.MaxFloat64
+
+		for i := 0; i < probes; i++ {
+			rtt, err := queryDNS(resolver.IP, domain, timeout)
+			if err != nil {
+				result.RTTs[i] = -1
+				result.Loss++
+			} else {
+				result.RTTs[i] = rtt
+				sum += rtt
+				cnt++
+				if rtt < result.Min {
+					result.Min = rtt
+				}
+				if rtt > result.Max {
+					result.Max = rtt
+				}
+			}
+		}
+
+		if cnt > 0 {
+			result.Avg = math.Round(sum/float64(cnt)*100) / 100
+			result.Min = math.Round(result.Min*100) / 100
+			result.Max = math.Round(result.Max*100) / 100
+			result.Status = "ok"
+		} else {
+			result.Min = -1
+			result.Avg = -1
+			result.Max = -1
+			result.Status = "timeout"
+		}
+
+		data, _ := json.Marshal(result)
+		fmt.Fprintf(rw, "data: %s\n\n", data)
+		flusher.Flush()
+	}
+
+	// 发送完成事件
+	fmt.Fprintf(rw, "data: {\"done\":true}\n\n")
+	flusher.Flush()
+}
+
+// ══════════════════════════════════════════════════════════
 //  HTTP 指纹
 // ══════════════════════════════════════════════════════════
 
@@ -1917,6 +2074,7 @@ func main() {
 	mux.HandleFunc("/api/unlock", webServer.handleUnlock)
 	mux.HandleFunc("/api/trace", webServer.handleTrace)
 	mux.HandleFunc("/api/headers", webServer.handleHeaders)
+	mux.HandleFunc("/api/dns-bench", webServer.handleDNSBench)
 
 	logger.Info("HTTP 开始监听 %s", cfg.WebPort)
 	if err := http.ListenAndServe(cfg.WebPort, mux); err != nil {
