@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -1818,6 +1819,44 @@ func (w *WebServer) handleTrace(rw http.ResponseWriter, r *http.Request) {
 }
 
 // ══════════════════════════════════════════════════════════
+//  HTTP 指纹
+// ══════════════════════════════════════════════════════════
+
+// handleHeaders 返回服务端收到的 HTTP 请求头及连接信息。
+func (w *WebServer) handleHeaders(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Access-Control-Allow-Origin", "*")
+	rw.Header().Set("Content-Type", "application/json")
+
+	clientIP := getClientIP(r)
+
+	// Collect all headers in order
+	headers := make([]map[string]string, 0, len(r.Header))
+	for name, values := range r.Header {
+		for _, v := range values {
+			headers = append(headers, map[string]string{"name": name, "value": v})
+		}
+	}
+
+	// Sort headers by name for consistent output
+	sort.Slice(headers, func(i, j int) bool {
+		return headers[i]["name"] < headers[j]["name"]
+	})
+
+	resp := map[string]any{
+		"client_ip":   clientIP,
+		"method":      r.Method,
+		"protocol":    r.Proto,
+		"host":        r.Host,
+		"uri":         r.RequestURI,
+		"remote_addr": r.RemoteAddr,
+		"headers":     headers,
+		"tls":         r.TLS != nil,
+	}
+
+	json.NewEncoder(rw).Encode(resp)
+}
+
+// ══════════════════════════════════════════════════════════
 //  程序入口
 // ══════════════════════════════════════════════════════════
 
@@ -1877,6 +1916,7 @@ func main() {
 	mux.HandleFunc("/api/leak", webServer.handleLeak)
 	mux.HandleFunc("/api/unlock", webServer.handleUnlock)
 	mux.HandleFunc("/api/trace", webServer.handleTrace)
+	mux.HandleFunc("/api/headers", webServer.handleHeaders)
 
 	logger.Info("HTTP 开始监听 %s", cfg.WebPort)
 	if err := http.ListenAndServe(cfg.WebPort, mux); err != nil {

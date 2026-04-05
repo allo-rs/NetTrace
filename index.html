@@ -1332,6 +1332,99 @@
     margin-top: 12px;
     line-height: 1.5;
   }
+  /* ── HTTP/浏览器指纹 ── */
+  .fp-section {
+    margin-top: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .fp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    gap: 12px;
+  }
+  .fp-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--text-bright);
+  }
+  .btn-fp {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--green);
+    font-size: 12px;
+    padding: 5px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn-fp:hover:not(:disabled) {
+    background: rgba(63,185,80,0.08);
+    border-color: rgba(63,185,80,0.4);
+  }
+  .btn-fp:disabled { opacity: 0.4; cursor: not-allowed; }
+  .fp-body {
+    padding: 0 18px 16px;
+  }
+  .fp-group {
+    margin-bottom: 14px;
+  }
+  .fp-group-title {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+  .fp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .fp-table td {
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--border-muted);
+    vertical-align: top;
+  }
+  .fp-table tr:last-child td { border-bottom: none; }
+  .fp-table td:first-child {
+    color: var(--text-muted);
+    white-space: nowrap;
+    width: 140px;
+    font-weight: 500;
+  }
+  .fp-table td:last-child {
+    font-family: var(--font-mono);
+    color: var(--text-bright);
+    word-break: break-all;
+  }
+  .fp-hash {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--purple);
+    background: var(--surface2);
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+  .fp-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 12px;
+    line-height: 1.5;
+  }
 </style>
 </head>
 <body>
@@ -1657,6 +1750,35 @@
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         <span>测速通过 Cloudflare 全球 CDN 边缘节点进行，结果反映您到最近 CF 节点的网络性能。实际体验可能因目标服务器不同而有差异。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── HTTP/浏览器指纹 ── -->
+  <div class="fp-section" id="fpSection" style="display:none">
+    <div class="fp-header">
+      <div class="fp-header-left">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--green)">
+          <path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 0 0 8 11a4 4 0 1 1 8 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0 0 15.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 0 0 8.08 3.488M3 3l18 18"/>
+        </svg>
+        HTTP / 浏览器指纹
+      </div>
+      <button class="btn-fp" id="fpBtn" onclick="runFingerprintTest()">开始检测</button>
+    </div>
+    <div class="fp-body" id="fpBody" style="display:none">
+      <div class="fp-group" id="fpBrowserGroup">
+        <div class="fp-group-title">🌐 浏览器指纹</div>
+        <table class="fp-table" id="fpBrowserTable"></table>
+      </div>
+      <div class="fp-group" id="fpHeaderGroup">
+        <div class="fp-group-title">📡 服务端收到的 HTTP 请求头</div>
+        <table class="fp-table" id="fpHeaderTable"></table>
+      </div>
+      <div class="fp-note" id="fpNote" style="display:none">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>浏览器指纹基于本地 JavaScript 采集，HTTP 头由服务端返回。Canvas/WebGL 哈希可用于跨站追踪识别。</span>
       </div>
     </div>
   </div>
@@ -2028,6 +2150,7 @@ async function runDetect() {
   document.getElementById('ipv6Section').style.display = '';
   document.getElementById('natSection').style.display = '';
   document.getElementById('speedSection').style.display = '';
+  document.getElementById('fpSection').style.display = '';
 
   finalize();
 }
@@ -2573,6 +2696,163 @@ document.addEventListener('DOMContentLoaded', () => {
 // ─────────────────────────────────────────────────────────────────
 // NAT 类型检测
 // ─────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────
+// HTTP / 浏览器指纹
+// ─────────────────────────────────────────────────────────────────
+
+/** Simple hash function for fingerprint strings */
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const chr = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + chr;
+    hash |= 0;
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+/** Get Canvas fingerprint hash */
+function getCanvasFingerprint() {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 200;
+    canvas.height = 50;
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'top';
+    ctx.font = '14px Arial';
+    ctx.fillStyle = '#f60';
+    ctx.fillRect(125, 1, 62, 20);
+    ctx.fillStyle = '#069';
+    ctx.fillText('NetTrace fp', 2, 15);
+    ctx.fillStyle = 'rgba(102,204,0,0.7)';
+    ctx.fillText('NetTrace fp', 4, 17);
+    return simpleHash(canvas.toDataURL());
+  } catch { return 'N/A'; }
+}
+
+/** Get WebGL renderer info */
+function getWebGLInfo() {
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) return { vendor: 'N/A', renderer: 'N/A' };
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    return {
+      vendor: ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR),
+      renderer: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)
+    };
+  } catch { return { vendor: 'N/A', renderer: 'N/A' }; }
+}
+
+/** Detect browser name and version from User-Agent */
+function parseBrowser() {
+  const ua = navigator.userAgent;
+  let browser = '未知', version = '';
+  if (ua.includes('Firefox/')) { browser = 'Firefox'; version = ua.match(/Firefox\/([\d.]+)/)?.[1] || ''; }
+  else if (ua.includes('Edg/')) { browser = 'Edge'; version = ua.match(/Edg\/([\d.]+)/)?.[1] || ''; }
+  else if (ua.includes('Chrome/') && !ua.includes('Edg/')) { browser = 'Chrome'; version = ua.match(/Chrome\/([\d.]+)/)?.[1] || ''; }
+  else if (ua.includes('Safari/') && !ua.includes('Chrome/')) { browser = 'Safari'; version = ua.match(/Version\/([\d.]+)/)?.[1] || ''; }
+  return browser + (version ? ' ' + version : '');
+}
+
+/** Detect OS from User-Agent */
+function parseOS() {
+  const ua = navigator.userAgent;
+  if (ua.includes('Windows NT 10.0')) return 'Windows 10/11';
+  if (ua.includes('Windows NT')) return 'Windows';
+  if (ua.includes('Mac OS X')) { const v = ua.match(/Mac OS X ([\d_]+)/)?.[1]?.replace(/_/g, '.'); return 'macOS' + (v ? ' ' + v : ''); }
+  if (ua.includes('Linux') && ua.includes('Android')) return 'Android';
+  if (ua.includes('Linux')) return 'Linux';
+  if (ua.includes('iPhone') || ua.includes('iPad')) return 'iOS';
+  return '未知';
+}
+
+async function runFingerprintTest() {
+  const btn = document.getElementById('fpBtn');
+  const body = document.getElementById('fpBody');
+  const browserTable = document.getElementById('fpBrowserTable');
+  const headerTable = document.getElementById('fpHeaderTable');
+  const note = document.getElementById('fpNote');
+
+  btn.disabled = true;
+  btn.textContent = '检测中…';
+  body.style.display = 'block';
+  browserTable.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted)">采集中…</td></tr>';
+  headerTable.innerHTML = '<tr><td colspan="2" style="color:var(--text-muted)">请求中…</td></tr>';
+  note.style.display = 'none';
+
+  // 1. Browser fingerprint (client-side)
+  const canvasHash = getCanvasFingerprint();
+  const webgl = getWebGLInfo();
+  const browser = parseBrowser();
+  const os = parseOS();
+  const langs = navigator.languages ? navigator.languages.join(', ') : navigator.language;
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const screen = `${window.screen.width}×${window.screen.height} (${window.devicePixelRatio}x)`;
+  const cores = navigator.hardwareConcurrency || 'N/A';
+  const mem = navigator.deviceMemory ? navigator.deviceMemory + ' GB' : 'N/A';
+  const touch = navigator.maxTouchPoints > 0 ? `是 (${navigator.maxTouchPoints} 点)` : '否';
+  const cookieEnabled = navigator.cookieEnabled ? '是' : '否';
+  const dnt = navigator.doNotTrack === '1' ? '是' : '否';
+  const platform = navigator.platform || 'N/A';
+
+  // Compose unique fingerprint hash
+  const fpRaw = [canvasHash, webgl.renderer, langs, tz, screen, cores, platform].join('|');
+  const fpHash = simpleHash(fpRaw);
+
+  const browserRows = [
+    ['浏览器', browser],
+    ['操作系统', os],
+    ['平台', platform],
+    ['语言', langs],
+    ['时区', tz],
+    ['屏幕分辨率', screen],
+    ['CPU 核心数', cores],
+    ['设备内存', mem],
+    ['触控支持', touch],
+    ['Cookie', cookieEnabled],
+    ['Do Not Track', dnt],
+    ['Canvas 哈希', `<span class="fp-hash">${canvasHash}</span>`],
+    ['WebGL 厂商', webgl.vendor],
+    ['WebGL 渲染器', webgl.renderer],
+    ['综合指纹哈希', `<span class="fp-hash">${fpHash}</span>`],
+  ];
+
+  browserTable.innerHTML = browserRows.map(([k, v]) =>
+    `<tr><td>${k}</td><td>${v}</td></tr>`
+  ).join('');
+
+  // 2. Server-side HTTP headers
+  try {
+    const resp = await fetch('/api/headers', { cache: 'no-store' });
+    const data = await resp.json();
+
+    const headerRows = [];
+    headerRows.push(['请求方法', data.method]);
+    headerRows.push(['协议版本', data.protocol]);
+    headerRows.push(['Host', data.host]);
+    headerRows.push(['客户端 IP', data.client_ip]);
+    headerRows.push(['RemoteAddr', data.remote_addr]);
+    headerRows.push(['TLS 加密', data.tls ? '是' : '否']);
+
+    if (data.headers && data.headers.length > 0) {
+      for (const h of data.headers) {
+        headerRows.push([h.name, h.value]);
+      }
+    }
+
+    headerTable.innerHTML = headerRows.map(([k, v]) =>
+      `<tr><td>${k}</td><td>${v}</td></tr>`
+    ).join('');
+  } catch (e) {
+    headerTable.innerHTML = `<tr><td colspan="2" style="color:var(--red)">请求失败: ${e.message}</td></tr>`;
+  }
+
+  note.style.display = 'flex';
+  btn.disabled = false;
+  btn.textContent = '重新检测';
+}
 
 const NAT_TYPES = {
   open:       { label: '开放网络', cls: 'open',       icon: '🟢', desc: '无 NAT，直接使用公网 IP。所有网络应用均可正常使用。' },
