@@ -932,6 +932,148 @@
     margin-top: 10px;
     line-height: 1.5;
   }
+
+  /* ── 网速测试 ── */
+  .speed-section {
+    margin-top: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .speed-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    gap: 12px;
+  }
+  .speed-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--text-bright);
+  }
+  .btn-speed {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--blue);
+    font-size: 12px;
+    padding: 5px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn-speed:hover:not(:disabled) {
+    background: rgba(88,166,255,0.08);
+    border-color: rgba(88,166,255,0.4);
+  }
+  .btn-speed:disabled { opacity: 0.4; cursor: not-allowed; }
+  .speed-body {
+    padding: 0 18px 18px;
+  }
+  .speed-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 600px) { .speed-metrics { grid-template-columns: repeat(2, 1fr); } }
+  .speed-metric {
+    background: var(--surface2);
+    border: 1px solid var(--border-muted);
+    border-radius: 8px;
+    padding: 14px 12px;
+    text-align: center;
+    transition: border-color 0.3s;
+  }
+  .speed-metric.active {
+    border-color: var(--blue);
+  }
+  .speed-metric.done {
+    border-color: rgba(63,185,80,0.3);
+  }
+  .speed-metric-icon {
+    font-size: 16px;
+    margin-bottom: 6px;
+  }
+  .speed-metric-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .speed-metric-value {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text-bright);
+    line-height: 1.2;
+  }
+  .speed-metric-unit {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-left: 2px;
+  }
+  .speed-metric-value.waiting {
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .speed-metric-value.testing {
+    color: var(--blue);
+    animation: pulse 1.2s infinite;
+  }
+  .speed-progress {
+    margin-bottom: 14px;
+  }
+  .speed-progress-text {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .speed-progress-text .spinner {
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--border);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .speed-progress-bar-wrap {
+    height: 3px;
+    background: var(--border-muted);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .speed-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--blue), var(--purple));
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.3s;
+  }
+  .speed-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 14px;
+    line-height: 1.5;
+  }
+  .speed-error {
+    color: var(--red);
+    font-size: 12px;
+    padding: 8px 0;
+    text-align: center;
+  }
 </style>
 </head>
 <body>
@@ -1154,6 +1296,59 @@
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         检测基于您的浏览器网络（前端直连，无需服务器中转）
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 网速测试 ── -->
+  <div class="speed-section" id="speedSection" style="display:none">
+    <div class="speed-header">
+      <div class="speed-header-left">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--blue)">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        网速测试
+      </div>
+      <button class="btn-speed" id="speedBtn" onclick="runSpeedTest()">开始测速</button>
+    </div>
+    <div class="speed-body" id="speedBody" style="display:none">
+      <div class="speed-progress" id="speedProgress" style="display:none">
+        <div class="speed-progress-text">
+          <div class="spinner"></div>
+          <span id="speedProgressText">准备中…</span>
+        </div>
+        <div class="speed-progress-bar-wrap">
+          <div class="speed-progress-bar" id="speedProgressBar"></div>
+        </div>
+      </div>
+      <div class="speed-metrics">
+        <div class="speed-metric" id="speedPing">
+          <div class="speed-metric-icon">🏓</div>
+          <div class="speed-metric-label">延迟</div>
+          <div class="speed-metric-value waiting" id="speedPingVal">—</div>
+        </div>
+        <div class="speed-metric" id="speedJitter">
+          <div class="speed-metric-icon">📊</div>
+          <div class="speed-metric-label">抖动</div>
+          <div class="speed-metric-value waiting" id="speedJitterVal">—</div>
+        </div>
+        <div class="speed-metric" id="speedDown">
+          <div class="speed-metric-icon">⬇️</div>
+          <div class="speed-metric-label">下载</div>
+          <div class="speed-metric-value waiting" id="speedDownVal">—</div>
+        </div>
+        <div class="speed-metric" id="speedUp">
+          <div class="speed-metric-icon">⬆️</div>
+          <div class="speed-metric-label">上传</div>
+          <div class="speed-metric-value waiting" id="speedUpVal">—</div>
+        </div>
+      </div>
+      <div id="speedError" class="speed-error" style="display:none"></div>
+      <div class="speed-note" id="speedNote" style="display:none">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>测速通过 Cloudflare 全球 CDN 边缘节点进行，结果反映您到最近 CF 节点的网络性能。实际体验可能因目标服务器不同而有差异。</span>
       </div>
     </div>
   </div>
@@ -1522,6 +1717,7 @@ async function runDetect() {
   document.getElementById('leakSection').style.display = 'block';
   document.getElementById('traceSection').style.display = '';
   document.getElementById('unlockSection').style.display = 'block';
+  document.getElementById('speedSection').style.display = '';
 
   finalize();
 }
@@ -2063,6 +2259,212 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────
+// 网速测试（Cloudflare CDN）
+// ─────────────────────────────────────────────────────────────────
+
+const CF_DOWN = 'https://speed.cloudflare.com/__down';
+const CF_UP   = 'https://speed.cloudflare.com/__up';
+
+/** Format speed with adaptive unit */
+function formatSpeed(mbps) {
+  if (mbps >= 1000) return { val: (mbps / 1000).toFixed(2), unit: 'Gbps' };
+  if (mbps >= 10)   return { val: mbps.toFixed(1), unit: 'Mbps' };
+  if (mbps >= 1)    return { val: mbps.toFixed(2), unit: 'Mbps' };
+  return { val: (mbps * 1000).toFixed(0), unit: 'Kbps' };
+}
+
+/** Set metric card value and state */
+function setMetric(id, value, unit, state) {
+  const card = document.getElementById(id);
+  const valEl = document.getElementById(id + 'Val');
+  card.className = 'speed-metric' + (state ? ' ' + state : '');
+  if (state === 'active') {
+    valEl.className = 'speed-metric-value testing';
+    valEl.innerHTML = value;
+  } else if (state === 'done') {
+    valEl.className = 'speed-metric-value';
+    valEl.innerHTML = unit ? value + '<span class="speed-metric-unit">' + unit + '</span>' : value;
+  } else {
+    valEl.className = 'speed-metric-value waiting';
+    valEl.innerHTML = value;
+  }
+}
+
+/** Measure latency and jitter with multiple pings */
+async function measureLatency(signal) {
+  const times = [];
+  const count = 20;
+
+  for (let i = 0; i < count; i++) {
+    if (signal && signal.aborted) throw new DOMException('Aborted', 'AbortError');
+    const start = performance.now();
+    await fetch(CF_DOWN + '?bytes=0&_=' + Date.now(), {
+      cache: 'no-store',
+      mode: 'cors',
+      signal
+    });
+    times.push(performance.now() - start);
+  }
+
+  // Remove top/bottom 2 outliers
+  times.sort((a, b) => a - b);
+  const trimmed = times.slice(2, -2);
+
+  const avg = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
+  const jitter = Math.sqrt(trimmed.reduce((s, t) => s + (t - avg) ** 2, 0) / trimmed.length);
+
+  return { latency: Math.round(avg * 10) / 10, jitter: Math.round(jitter * 10) / 10 };
+}
+
+/** Measure download speed using ReadableStream */
+async function measureDownload(onProgress, signal) {
+  // Warmup: 2MB
+  await fetch(CF_DOWN + '?bytes=2000000&_=' + Date.now(), { cache: 'no-store', signal });
+
+  // Main test: 25MB
+  const testBytes = 25000000;
+  const resp = await fetch(CF_DOWN + '?bytes=' + testBytes + '&_=' + Date.now(), {
+    cache: 'no-store',
+    mode: 'cors',
+    signal
+  });
+
+  const reader = resp.body.getReader();
+  let totalBytes = 0;
+  const startTime = performance.now();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    totalBytes += value.length;
+    const elapsed = (performance.now() - startTime) / 1000;
+    if (elapsed > 0.5) {
+      const mbps = (totalBytes * 8) / (elapsed * 1000000);
+      onProgress(mbps);
+    }
+  }
+
+  const totalElapsed = (performance.now() - startTime) / 1000;
+  const mbps = (totalBytes * 8) / (totalElapsed * 1000000);
+  return mbps;
+}
+
+/** Measure upload speed */
+async function measureUpload(onProgress, signal) {
+  // Warmup: 1MB
+  const warmupData = new Uint8Array(1000000);
+  crypto.getRandomValues(warmupData);
+  await fetch(CF_UP, { method: 'POST', body: warmupData, mode: 'cors', signal });
+
+  // Main test: 10MB
+  const testSize = 10000000;
+  const uploadData = new Uint8Array(testSize);
+  crypto.getRandomValues(uploadData);
+
+  const startTime = performance.now();
+  await fetch(CF_UP, { method: 'POST', body: uploadData, mode: 'cors', signal });
+  const elapsed = (performance.now() - startTime) / 1000;
+  const mbps = (testSize * 8) / (elapsed * 1000000);
+
+  return mbps;
+}
+
+let speedAbortCtrl = null;
+
+async function runSpeedTest() {
+  const btn = document.getElementById('speedBtn');
+  const body = document.getElementById('speedBody');
+  const progress = document.getElementById('speedProgress');
+  const progText = document.getElementById('speedProgressText');
+  const progBar = document.getElementById('speedProgressBar');
+  const errorEl = document.getElementById('speedError');
+  const noteEl = document.getElementById('speedNote');
+
+  if (speedAbortCtrl) {
+    speedAbortCtrl.abort();
+    speedAbortCtrl = null;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '测速中…';
+  body.style.display = 'block';
+  progress.style.display = 'block';
+  errorEl.style.display = 'none';
+  noteEl.style.display = 'none';
+
+  // Reset all metrics
+  setMetric('speedPing', '—', '', '');
+  setMetric('speedJitter', '—', '', '');
+  setMetric('speedDown', '—', '', '');
+  setMetric('speedUp', '—', '', '');
+  progBar.style.width = '0%';
+
+  speedAbortCtrl = new AbortController();
+  const signal = speedAbortCtrl.signal;
+
+  try {
+    // Phase 1: Latency & Jitter (0-25%)
+    progText.textContent = '测量延迟…';
+    setMetric('speedPing', '测量中', '', 'active');
+    setMetric('speedJitter', '测量中', '', 'active');
+
+    const { latency, jitter } = await measureLatency(signal);
+    progBar.style.width = '25%';
+
+    setMetric('speedPing', latency.toFixed(1), 'ms', 'done');
+    setMetric('speedJitter', jitter.toFixed(1), 'ms', 'done');
+
+    // Phase 2: Download (25-65%)
+    progText.textContent = '测量下载速度…';
+    setMetric('speedDown', '测量中', '', 'active');
+
+    const downSpeed = await measureDownload((mbps) => {
+      const f = formatSpeed(mbps);
+      setMetric('speedDown', f.val, f.unit, 'active');
+      // Estimate progress within download phase
+      const p = Math.min(65, 25 + (mbps > 0 ? 30 : 0));
+      progBar.style.width = p + '%';
+    }, signal);
+
+    const df = formatSpeed(downSpeed);
+    setMetric('speedDown', df.val, df.unit, 'done');
+    progBar.style.width = '65%';
+
+    // Phase 3: Upload (65-100%)
+    progText.textContent = '测量上传速度…';
+    setMetric('speedUp', '测量中', '', 'active');
+
+    const upSpeed = await measureUpload((mbps) => {
+      const f = formatSpeed(mbps);
+      setMetric('speedUp', f.val, f.unit, 'active');
+    }, signal);
+
+    const uf = formatSpeed(upSpeed);
+    setMetric('speedUp', uf.val, uf.unit, 'done');
+    progBar.style.width = '100%';
+
+    // Done
+    progText.innerHTML = '✓ 测速完成';
+    setTimeout(() => { progress.style.display = 'none'; }, 1500);
+
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      progText.textContent = '测速已取消';
+    } else {
+      console.error('Speed test error:', e);
+      errorEl.textContent = '测速失败: ' + (e.message || '网络错误');
+      errorEl.style.display = 'block';
+      progress.style.display = 'none';
+    }
+  } finally {
+    noteEl.style.display = 'flex';
+    btn.disabled = false;
+    btn.textContent = '重新测速';
+    speedAbortCtrl = null;
+  }
+}
 
 // 页面加载完成后自动开始检测
 runDetect();
