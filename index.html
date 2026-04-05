@@ -1210,6 +1210,128 @@
     margin-top: 12px;
     line-height: 1.5;
   }
+  /* ── NAT 类型检测 ── */
+  .nat-section {
+    margin-top: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .nat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    gap: 12px;
+  }
+  .nat-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--text-bright);
+  }
+  .btn-nat {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--yellow);
+    font-size: 12px;
+    padding: 5px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn-nat:hover:not(:disabled) {
+    background: rgba(227,179,65,0.08);
+    border-color: rgba(227,179,65,0.4);
+  }
+  .btn-nat:disabled { opacity: 0.4; cursor: not-allowed; }
+  .nat-body {
+    padding: 0 18px 16px;
+  }
+  .nat-result {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .nat-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .nat-type-badge.open {
+    background: rgba(63,185,80,0.1);
+    color: var(--green);
+    border: 1px solid rgba(63,185,80,0.25);
+  }
+  .nat-type-badge.fullcone {
+    background: rgba(63,185,80,0.1);
+    color: var(--green);
+    border: 1px solid rgba(63,185,80,0.25);
+  }
+  .nat-type-badge.restricted {
+    background: rgba(227,179,65,0.1);
+    color: var(--yellow);
+    border: 1px solid rgba(227,179,65,0.25);
+  }
+  .nat-type-badge.symmetric {
+    background: rgba(248,81,73,0.1);
+    color: var(--red);
+    border: 1px solid rgba(248,81,73,0.2);
+  }
+  .nat-type-badge.blocked {
+    background: rgba(248,81,73,0.1);
+    color: var(--red);
+    border: 1px solid rgba(248,81,73,0.2);
+  }
+  .nat-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  @media (max-width: 500px) { .nat-details { grid-template-columns: 1fr; } }
+  .nat-detail-card {
+    background: var(--surface2);
+    border: 1px solid var(--border-muted);
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+  .nat-detail-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+  .nat-detail-value {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-bright);
+    word-break: break-all;
+  }
+  .nat-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+  .nat-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 12px;
+    line-height: 1.5;
+  }
 </style>
 </head>
 <body>
@@ -1458,6 +1580,30 @@
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         <span>检测通过外部 API 分别探测 IPv4 和 IPv6 连接。若您的网络或浏览器禁用了 IPv6，将显示为不可用。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── NAT 类型检测 ── -->
+  <div class="nat-section" id="natSection" style="display:none">
+    <div class="nat-header">
+      <div class="nat-header-left">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--yellow)">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        NAT 类型检测
+      </div>
+      <button class="btn-nat" id="natBtn" onclick="runNATTest()">开始检测</button>
+    </div>
+    <div class="nat-body" id="natBody" style="display:none">
+      <div id="natResult"></div>
+      <div class="nat-details" id="natDetails"></div>
+      <div class="nat-note" id="natNote" style="display:none">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>NAT 类型通过 WebRTC ICE 候选地址分析判断。对称型 NAT 可能影响 P2P 连接（如视频通话、游戏联机）。检测结果仅供参考。</span>
       </div>
     </div>
   </div>
@@ -1880,6 +2026,7 @@ async function runDetect() {
   document.getElementById('traceSection').style.display = '';
   document.getElementById('unlockSection').style.display = 'block';
   document.getElementById('ipv6Section').style.display = '';
+  document.getElementById('natSection').style.display = '';
   document.getElementById('speedSection').style.display = '';
 
   finalize();
@@ -2422,6 +2569,184 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────
+// NAT 类型检测
+// ─────────────────────────────────────────────────────────────────
+
+const NAT_TYPES = {
+  open:       { label: '开放网络', cls: 'open',       icon: '🟢', desc: '无 NAT，直接使用公网 IP。所有网络应用均可正常使用。' },
+  fullcone:   { label: '完全锥形 NAT', cls: 'fullcone',   icon: '🟢', desc: 'NAT 映射对所有外部主机开放，P2P 连接友好，游戏和视频通话正常。' },
+  restricted: { label: '受限锥形 NAT', cls: 'restricted', icon: '🟡', desc: 'NAT 仅允许已通信的主机回连，大部分应用正常，部分 P2P 可能需要中继。' },
+  symmetric:  { label: '对称型 NAT', cls: 'symmetric',  icon: '🔴', desc: '每个目标使用不同端口映射，P2P 连接困难，视频通话和游戏可能需要 TURN 中继服务器。' },
+  blocked:    { label: 'UDP 被阻止', cls: 'blocked',    icon: '🔴', desc: '无法建立 UDP 连接，可能被防火墙或运营商限制。VoIP、游戏等实时应用可能异常。' }
+};
+
+async function gatherCandidates(stunServer) {
+  return new Promise((resolve) => {
+    const candidates = { host: [], srflx: [] };
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: stunServer }]
+    });
+
+    const timeout = setTimeout(() => {
+      pc.close();
+      resolve(candidates);
+    }, 8000);
+
+    pc.onicecandidate = (e) => {
+      if (!e.candidate) {
+        clearTimeout(timeout);
+        pc.close();
+        resolve(candidates);
+        return;
+      }
+      const c = e.candidate;
+      if (c.type === 'host' && c.address) {
+        candidates.host.push({ ip: c.address, port: c.port, protocol: c.protocol });
+      } else if (c.type === 'srflx' && c.address) {
+        candidates.srflx.push({ ip: c.address, port: c.port, protocol: c.protocol, relatedAddress: c.relatedAddress });
+      }
+    };
+
+    pc.createDataChannel('nat-test');
+    pc.createOffer().then(offer => pc.setLocalDescription(offer)).catch(() => {
+      clearTimeout(timeout);
+      pc.close();
+      resolve(candidates);
+    });
+  });
+}
+
+function isPublicIP(ip) {
+  if (!ip) return false;
+  if (ip.includes(':')) return !ip.startsWith('fe80') && !ip.startsWith('fc') && !ip.startsWith('fd') && ip !== '::1';
+  const parts = ip.split('.').map(Number);
+  if (parts[0] === 10) return false;
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return false;
+  if (parts[0] === 192 && parts[1] === 168) return false;
+  if (parts[0] === 127) return false;
+  return true;
+}
+
+async function runNATTest() {
+  const btn = document.getElementById('natBtn');
+  const body = document.getElementById('natBody');
+  const result = document.getElementById('natResult');
+  const details = document.getElementById('natDetails');
+  const note = document.getElementById('natNote');
+
+  btn.disabled = true;
+  btn.textContent = '检测中…';
+  body.style.display = 'block';
+  result.innerHTML = '<span style="color:var(--text-muted);font-size:12px">正在通过 STUN 服务器探测…</span>';
+  details.innerHTML = '';
+  note.style.display = 'none';
+
+  try {
+    // Gather from two different STUN servers
+    const [c1, c2] = await Promise.all([
+      gatherCandidates('stun:stun.l.google.com:19302'),
+      gatherCandidates('stun:stun1.l.google.com:19302')
+    ]);
+
+    // Merge host candidates
+    const allHosts = [...c1.host, ...c2.host];
+    const uniqueHostIPs = [...new Set(allHosts.map(h => h.ip))];
+    const publicHosts = uniqueHostIPs.filter(isPublicIP);
+
+    const srflx1 = c1.srflx;
+    const srflx2 = c2.srflx;
+
+    let natType;
+    let mappedIP = null;
+    let mappedPort1 = null;
+    let mappedPort2 = null;
+
+    if (srflx1.length === 0 && srflx2.length === 0) {
+      if (publicHosts.length > 0) {
+        natType = 'open';
+        mappedIP = publicHosts[0];
+      } else {
+        natType = 'blocked';
+      }
+    } else {
+      // Get the first srflx from each
+      const s1 = srflx1[0];
+      const s2 = srflx2[0];
+
+      if (s1 && s2) {
+        mappedIP = s1.ip;
+        mappedPort1 = s1.port;
+        mappedPort2 = s2.port;
+
+        if (s1.ip === s2.ip && s1.port === s2.port) {
+          natType = 'fullcone';
+        } else if (s1.ip === s2.ip && s1.port !== s2.port) {
+          natType = 'symmetric';
+        } else {
+          natType = 'symmetric';
+        }
+      } else {
+        const s = s1 || s2;
+        mappedIP = s.ip;
+        natType = 'restricted';
+      }
+    }
+
+    const info = NAT_TYPES[natType];
+
+    // Render result
+    result.innerHTML = `
+      <div class="nat-result">
+        <div class="nat-type-badge ${info.cls}">${info.icon} ${info.label}</div>
+      </div>
+      <div class="nat-desc">${info.desc}</div>`;
+
+    // Render details
+    let detailsHTML = '';
+
+    if (mappedIP) {
+      detailsHTML += `
+        <div class="nat-detail-card">
+          <div class="nat-detail-label">公网映射 IP</div>
+          <div class="nat-detail-value">${mappedIP}</div>
+        </div>`;
+    }
+
+    if (mappedPort1 && mappedPort2) {
+      detailsHTML += `
+        <div class="nat-detail-card">
+          <div class="nat-detail-label">端口映射</div>
+          <div class="nat-detail-value">STUN1: ${mappedPort1} / STUN2: ${mappedPort2}${mappedPort1 === mappedPort2 ? ' (一致)' : ' (不一致)'}</div>
+        </div>`;
+    }
+
+    const localIPs = uniqueHostIPs.filter(ip => !isPublicIP(ip));
+    if (localIPs.length > 0) {
+      detailsHTML += `
+        <div class="nat-detail-card">
+          <div class="nat-detail-label">本地接口</div>
+          <div class="nat-detail-value">${localIPs.join(', ')}</div>
+        </div>`;
+    }
+
+    detailsHTML += `
+      <div class="nat-detail-card">
+        <div class="nat-detail-label">候选地址统计</div>
+        <div class="nat-detail-value">Host: ${allHosts.length} / SRFLX: ${srflx1.length + srflx2.length}</div>
+      </div>`;
+
+    details.innerHTML = detailsHTML;
+
+  } catch (e) {
+    result.innerHTML = `<div style="color:var(--red);font-size:12px">检测失败: ${e.message || '浏览器不支持 WebRTC'}</div>`;
+  } finally {
+    note.style.display = 'flex';
+    btn.disabled = false;
+    btn.textContent = '重新检测';
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────
 // IPv6 双栈检测
