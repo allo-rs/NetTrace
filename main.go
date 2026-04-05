@@ -2211,6 +2211,30 @@ func (w *WebServer) handleIPType(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(result)
 }
 
+// handleIPCheck 代理查询 ip-api.com 获取客户端 IP 信息（避免 CORS 限制）。
+func (w *WebServer) handleIPCheck(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Access-Control-Allow-Origin", "*")
+	rw.Header().Set("Content-Type", "application/json")
+
+	clientIP := getClientIP(r)
+
+	apiURL := fmt.Sprintf("http://ip-api.com/json/%s?fields=status,message,country,regionName,city,isp,org,as,proxy,hosting,mobile,query", clientIP)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	req, _ := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		rw.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(rw).Encode(map[string]string{"error": fmt.Sprintf("ip-api.com 查询失败: %v", err)})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
+	rw.Write(body)
+}
+
 func main() {
 	cfg := buildConfig()
 
@@ -2269,6 +2293,7 @@ func main() {
 	mux.HandleFunc("/api/trace", webServer.handleTrace)
 	mux.HandleFunc("/api/headers", webServer.handleHeaders)
 	mux.HandleFunc("/api/ip-type", webServer.handleIPType)
+	mux.HandleFunc("/api/ip-check", webServer.handleIPCheck)
 	mux.HandleFunc("/api/dns-bench", webServer.handleDNSBench)
 
 	logger.Info("HTTP 开始监听 %s", cfg.WebPort)
