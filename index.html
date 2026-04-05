@@ -1074,6 +1074,142 @@
     padding: 8px 0;
     text-align: center;
   }
+
+  /* ── IPv6 双栈检测 ── */
+  .ipv6-section {
+    margin-top: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .ipv6-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    gap: 12px;
+  }
+  .ipv6-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--text-bright);
+  }
+  .btn-ipv6 {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--purple);
+    font-size: 12px;
+    padding: 5px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn-ipv6:hover:not(:disabled) {
+    background: rgba(188,140,255,0.08);
+    border-color: rgba(188,140,255,0.4);
+  }
+  .btn-ipv6:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ipv6-body {
+    padding: 0 18px 16px;
+  }
+  .ipv6-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 14px;
+  }
+  .ipv6-badge.dual {
+    background: rgba(63,185,80,0.1);
+    color: var(--green);
+    border: 1px solid rgba(63,185,80,0.25);
+  }
+  .ipv6-badge.v4only {
+    background: rgba(227,179,65,0.1);
+    color: var(--yellow);
+    border: 1px solid rgba(227,179,65,0.25);
+  }
+  .ipv6-badge.v6only {
+    background: rgba(88,166,255,0.1);
+    color: var(--blue);
+    border: 1px solid rgba(88,166,255,0.25);
+  }
+  .ipv6-badge.fail {
+    background: rgba(248,81,73,0.1);
+    color: var(--red);
+    border: 1px solid rgba(248,81,73,0.2);
+  }
+  .ipv6-results {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  @media (max-width: 500px) { .ipv6-results { grid-template-columns: 1fr; } }
+  .ipv6-card {
+    background: var(--surface2);
+    border: 1px solid var(--border-muted);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .ipv6-card.ok { border-color: rgba(63,185,80,0.25); }
+  .ipv6-card.na { border-color: rgba(248,81,73,0.15); opacity: 0.6; }
+  .ipv6-card-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .ipv6-card-label .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .ipv6-card-label .dot.ok { background: var(--green); }
+  .ipv6-card-label .dot.na { background: var(--red); }
+  .ipv6-card-ip {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-bright);
+    word-break: break-all;
+    margin-bottom: 6px;
+  }
+  .ipv6-card-tags .tag {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+  .ipv6-prefer {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .ipv6-prefer strong {
+    color: var(--text-bright);
+    font-weight: 500;
+  }
+  .ipv6-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 12px;
+    line-height: 1.5;
+  }
 </style>
 </head>
 <body>
@@ -1296,6 +1432,32 @@
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         检测基于您的浏览器网络（前端直连，无需服务器中转）
+      </div>
+    </div>
+  </div>
+
+  <!-- ── IPv6 双栈检测 ── -->
+  <div class="ipv6-section" id="ipv6Section" style="display:none">
+    <div class="ipv6-header">
+      <div class="ipv6-header-left">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--purple)">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5"/>
+          <path d="M2 12l10 5 10-5"/>
+        </svg>
+        IPv6 双栈检测
+      </div>
+      <button class="btn-ipv6" id="ipv6Btn" onclick="runIPv6Test()">开始检测</button>
+    </div>
+    <div class="ipv6-body" id="ipv6Body" style="display:none">
+      <div id="ipv6Badge"></div>
+      <div class="ipv6-results" id="ipv6Results"></div>
+      <div class="ipv6-prefer" id="ipv6Prefer" style="display:none"></div>
+      <div class="ipv6-note" id="ipv6Note" style="display:none">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>检测通过外部 API 分别探测 IPv4 和 IPv6 连接。若您的网络或浏览器禁用了 IPv6，将显示为不可用。</span>
       </div>
     </div>
   </div>
@@ -1717,6 +1879,7 @@ async function runDetect() {
   document.getElementById('leakSection').style.display = 'block';
   document.getElementById('traceSection').style.display = '';
   document.getElementById('unlockSection').style.display = 'block';
+  document.getElementById('ipv6Section').style.display = '';
   document.getElementById('speedSection').style.display = '';
 
   finalize();
@@ -2259,6 +2422,124 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// ─────────────────────────────────────────────────────────────────
+// IPv6 双栈检测
+// ─────────────────────────────────────────────────────────────────
+
+async function runIPv6Test() {
+  const btn = document.getElementById('ipv6Btn');
+  const body = document.getElementById('ipv6Body');
+  const badge = document.getElementById('ipv6Badge');
+  const results = document.getElementById('ipv6Results');
+  const prefer = document.getElementById('ipv6Prefer');
+  const note = document.getElementById('ipv6Note');
+
+  btn.disabled = true;
+  btn.textContent = '检测中…';
+  body.style.display = 'block';
+  badge.innerHTML = '<span style="color:var(--text-muted);font-size:12px">正在检测…</span>';
+  results.innerHTML = '';
+  prefer.style.display = 'none';
+  note.style.display = 'none';
+
+  let v4ip = null, v6ip = null, prefIP = null;
+  let v4geo = null, v6geo = null;
+
+  // Parallel fetch: IPv4, IPv6, preferred
+  const timeout = (ms) => new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms));
+
+  const fetchIP = async (url) => {
+    const resp = await Promise.race([
+      fetch(url, { cache: 'no-store' }),
+      timeout(8000)
+    ]);
+    const data = await resp.json();
+    return data.ip;
+  };
+
+  const [v4result, v6result, prefResult] = await Promise.allSettled([
+    fetchIP('https://api4.ipify.org?format=json'),
+    fetchIP('https://api6.ipify.org?format=json'),
+    fetchIP('https://api64.ipify.org?format=json')
+  ]);
+
+  if (v4result.status === 'fulfilled') v4ip = v4result.value;
+  if (v6result.status === 'fulfilled') v6ip = v6result.value;
+  if (prefResult.status === 'fulfilled') prefIP = prefResult.value;
+
+  // Fetch GeoIP for discovered IPs
+  const fetchGeo = async (ip) => {
+    try {
+      const resp = await fetch('/api/geo?ip=' + encodeURIComponent(ip));
+      return await resp.json();
+    } catch { return null; }
+  };
+
+  const geoPromises = [];
+  if (v4ip) geoPromises.push(fetchGeo(v4ip).then(g => { v4geo = g; }));
+  if (v6ip) geoPromises.push(fetchGeo(v6ip).then(g => { v6geo = g; }));
+  await Promise.all(geoPromises);
+
+  // Determine status
+  const hasBoth = v4ip && v6ip;
+  const hasV4Only = v4ip && !v6ip;
+  const hasV6Only = !v4ip && v6ip;
+  const hasNone = !v4ip && !v6ip;
+
+  // Render badge
+  if (hasBoth) {
+    badge.innerHTML = '<div class="ipv6-badge dual">✓ 双栈 Dual Stack — 同时支持 IPv4 和 IPv6</div>';
+  } else if (hasV4Only) {
+    badge.innerHTML = '<div class="ipv6-badge v4only">⚠ 仅 IPv4 — 未检测到 IPv6 连接</div>';
+  } else if (hasV6Only) {
+    badge.innerHTML = '<div class="ipv6-badge v6only">⚠ 仅 IPv6 — 未检测到 IPv4 连接</div>';
+  } else {
+    badge.innerHTML = '<div class="ipv6-badge fail">✗ 检测失败 — 无法获取 IP 地址</div>';
+  }
+
+  // Render IP cards
+  let cardsHTML = '';
+
+  // IPv4 card
+  const v4tags = v4geo ? geoToTags(v4geo) : [];
+  const v4tagsHTML = v4tags.map(t => `<span class="tag ${t.cls}">${t.text}</span>`).join('');
+  cardsHTML += `
+    <div class="ipv6-card ${v4ip ? 'ok' : 'na'}">
+      <div class="ipv6-card-label">
+        <span class="dot ${v4ip ? 'ok' : 'na'}"></span>
+        IPv4
+      </div>
+      <div class="ipv6-card-ip">${v4ip || '不可用'}</div>
+      <div class="ipv6-card-tags">${v4ip ? v4tagsHTML || '' : ''}</div>
+    </div>`;
+
+  // IPv6 card
+  const v6tags = v6geo ? geoToTags(v6geo) : [];
+  const v6tagsHTML = v6tags.map(t => `<span class="tag ${t.cls}">${t.text}</span>`).join('');
+  cardsHTML += `
+    <div class="ipv6-card ${v6ip ? 'ok' : 'na'}">
+      <div class="ipv6-card-label">
+        <span class="dot ${v6ip ? 'ok' : 'na'}"></span>
+        IPv6
+      </div>
+      <div class="ipv6-card-ip">${v6ip || '不可用'}</div>
+      <div class="ipv6-card-tags">${v6ip ? v6tagsHTML || '' : ''}</div>
+    </div>`;
+
+  results.innerHTML = cardsHTML;
+
+  // Show preference
+  if (hasBoth && prefIP) {
+    const isV6Pref = prefIP.includes(':');
+    prefer.innerHTML = `🎯 浏览器偏好: <strong>${isV6Pref ? 'IPv6' : 'IPv4'}</strong>（连接时优先使用 ${isV6Pref ? 'IPv6' : 'IPv4'}）`;
+    prefer.style.display = 'flex';
+  }
+
+  note.style.display = 'flex';
+  btn.disabled = false;
+  btn.textContent = '重新检测';
+}
 
 // ─────────────────────────────────────────────────────────────────
 // 网速测试（Cloudflare CDN）
