@@ -11,11 +11,14 @@ package main
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"math"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -25,6 +28,8 @@ import (
 	"time"
 
 	"github.com/oschwald/maxminddb-golang"
+	"golang.org/x/net/icmp"
+	"golang.org/x/net/ipv4"
 )
 
 // ══════════════════════════════════════════════════════════
@@ -1003,6 +1008,7 @@ type WebServer struct {
 	cfg      *Config
 	store    *TokenStore
 	geoCache *GeoCache
+	traceRL  *traceRateLimiter
 }
 
 // getClientIP 从请求中提取真实客户端 IP，兼容反代。
@@ -1447,6 +1453,371 @@ func (w *WebServer) handleStats(rw http.ResponseWriter, r *http.Request) {
 }
 
 // ══════════════════════════════════════════════════════════
+//  路由追踪（Traceroute）
+// ══════════════════════════════════════════════════════════
+
+// TracerouteHop 表示一跳的探测结果
+type TracerouteHop struct {
+	Hop     int       `json:"hop"`
+	IP      string    `json:"ip"`
+	RTTs    []float64 `json:"rtts"`    // 毫秒，-1 表示超时
+	AvgRTT  float64   `json:"avg_rtt"` // 成功探测的平均 RTT，全部超时为 -1
+	Geo     *GeoInfo  `json:"geo,omitempty"`
+	IsDest  bool      `json:"is_dest"`
+	Timeout bool      `json:"timeout"` // 3 次探测全部超时
+}
+
+// TracerouteResult 最终汇总结果（用于 done 事件）
+type TracerouteResult struct {
+	Target     string          `json:"target"`
+	ResolvedIP string          `json:"resolved_ip"`
+	Hops       []TracerouteHop `json:"hops"`
+	Done       bool            `json:"done"`
+	Error      string          `json:"error,omitempty"`
+}
+
+// ---------- 速率限制 ----------
+
+type traceRateLimiter struct {
+	mu      sync.Mutex
+	counts  map[string]int
+	resetAt time.Time
+}
+
+func newTraceRateLimiter() *traceRateLimiter {
+	return &traceRateLimiter{counts: make(map[string]int), resetAt: time.Now().Add(time.Minute)}
+}
+
+const traceRateMaxPerIP = 5
+
+func (rl *traceRateLimiter) Allow(ip string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	now := time.Now()
+	if now.After(rl.resetAt) {
+		rl.counts = make(map[string]int)
+		rl.resetAt = now.Add(time.Minute)
+	}
+	if rl.counts[ip] >= traceRateMaxPerIP {
+		return false
+	}
+	rl.counts[ip]++
+	return true
+}
+
+// ---------- 核心 traceroute 实现 ----------
+
+// runTraceroute 执行 ICMP traceroute，逐跳将结果发送至 hopCh。
+func runTraceroute(ctx context.Context, target string, geoCache *GeoCache, hopCh chan<- TracerouteHop) {
+	defer close(hopCh)
+
+	// 解析目标地址
+	ip := net.ParseIP(target)
+	if ip == nil {
+		// 当作域名解析
+		addrs, err := net.DefaultResolver.LookupHost(ctx, target)
+		if err != nil {
+			logger.Warn("traceroute: 域名解析失败 %s: %v", target, err)
+			return
+		}
+		for _, a := range addrs {
+			if parsed := net.ParseIP(a); parsed != nil && parsed.To4() != nil {
+				ip = parsed
+				break
+			}
+		}
+		if ip == nil {
+			logger.Warn("traceroute: 无法获取 IPv4 地址: %s", target)
+			return
+		}
+	}
+
+	if ip.To4() == nil {
+		logger.Warn("traceroute: 仅支持 IPv4: %s", ip)
+		return
+	}
+
+	destIP := ip.To4().String()
+	logger.Info("traceroute: 开始追踪 %s (%s)", target, destIP)
+
+	// 打开 ICMP 监听
+	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	if err != nil {
+		logger.Error("traceroute: 无法打开 ICMP 套接字: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	pconn := ipv4.NewPacketConn(conn)
+	// 会话唯一 ID，避免并发追踪冲突
+	echoID := rand.Intn(0xffff)
+
+	const (
+		maxHops       = 30
+		probesPerHop  = 3
+		probeTimeout  = 2 * time.Second
+		maxConsecFail = 3
+	)
+
+	consecTimeout := 0
+
+	for ttl := 1; ttl <= maxHops; ttl++ {
+		select {
+		case <-ctx.Done():
+			logger.Info("traceroute: 上下文取消，停止追踪")
+			return
+		default:
+		}
+
+		if err := pconn.SetTTL(ttl); err != nil {
+			logger.Error("traceroute: 设置 TTL=%d 失败: %v", ttl, err)
+			return
+		}
+
+		hop := TracerouteHop{Hop: ttl, RTTs: make([]float64, probesPerHop)}
+		hopIP := ""
+		allTimeout := true
+		reachedDest := false
+
+		for p := 0; p < probesPerHop; p++ {
+			seq := ttl*probesPerHop + p
+
+			// 构造 ICMP Echo Request
+			msg := &icmp.Message{
+				Type: ipv4.ICMPTypeEcho,
+				Code: 0,
+				Body: &icmp.Echo{
+					ID:   echoID,
+					Seq:  seq,
+					Data: []byte("NETTRACE"),
+				},
+			}
+			wb, err := msg.Marshal(nil)
+			if err != nil {
+				hop.RTTs[p] = -1
+				continue
+			}
+
+			dst := &net.IPAddr{IP: net.ParseIP(destIP)}
+			start := time.Now()
+			if _, err := conn.WriteTo(wb, dst); err != nil {
+				hop.RTTs[p] = -1
+				continue
+			}
+
+			// 等待匹配的响应
+			_ = conn.SetReadDeadline(time.Now().Add(probeTimeout))
+			buf := make([]byte, 1500)
+			matched := false
+
+			for !matched {
+				n, peer, err := conn.ReadFrom(buf)
+				if err != nil {
+					// 超时或其他错误
+					break
+				}
+				rtt := time.Since(start)
+
+				parsed, err := icmp.ParseMessage(1, buf[:n]) // protocol 1 = ICMP
+				if err != nil {
+					continue
+				}
+
+				switch parsed.Type {
+				case ipv4.ICMPTypeEchoReply:
+					// 目标回复
+					if echo, ok := parsed.Body.(*icmp.Echo); ok && echo.ID == echoID && echo.Seq == seq {
+						hop.RTTs[p] = float64(rtt.Microseconds()) / 1000.0
+						hopIP = peer.String()
+						allTimeout = false
+						reachedDest = true
+						matched = true
+					}
+				case ipv4.ICMPTypeTimeExceeded:
+					// 中间路由器返回，需要从内嵌数据提取原始 Echo 来匹配
+					body := parsed.Body.(*icmp.TimeExceeded)
+					if len(body.Data) >= 28 { // IP header(20) + ICMP header(8)
+						innerData := body.Data
+						// 跳过内嵌 IP 头部（通常 20 字节，但 IHL 可变）
+						ihl := int(innerData[0]&0x0f) * 4
+						if ihl >= 20 && len(innerData) >= ihl+8 {
+							icmpPayload := innerData[ihl:]
+							innerID := int(icmpPayload[4])<<8 | int(icmpPayload[5])
+							innerSeq := int(icmpPayload[6])<<8 | int(icmpPayload[7])
+							if innerID == echoID && innerSeq == seq {
+								hop.RTTs[p] = float64(rtt.Microseconds()) / 1000.0
+								hopIP = peer.String()
+								allTimeout = false
+								matched = true
+							}
+						}
+					}
+				}
+			}
+
+			if !matched {
+				hop.RTTs[p] = -1
+			}
+		}
+
+		hop.IP = hopIP
+		hop.Timeout = allTimeout
+		hop.IsDest = reachedDest
+
+		// 计算平均 RTT
+		if allTimeout {
+			hop.AvgRTT = -1
+		} else {
+			var sum float64
+			var cnt int
+			for _, r := range hop.RTTs {
+				if r >= 0 {
+					sum += r
+					cnt++
+				}
+			}
+			if cnt > 0 {
+				hop.AvgRTT = math.Round(sum/float64(cnt)*100) / 100
+			} else {
+				hop.AvgRTT = -1
+			}
+		}
+
+		// Geo 查询
+		if hopIP != "" {
+			geo, err := getGeoInfoCached(hopIP, geoCache)
+			if err == nil {
+				hop.Geo = geo
+			}
+		}
+
+		// 发送到通道
+		select {
+		case hopCh <- hop:
+		case <-ctx.Done():
+			return
+		}
+
+		if reachedDest {
+			logger.Info("traceroute: 到达目标 %s，TTL=%d", destIP, ttl)
+			return
+		}
+
+		if allTimeout {
+			consecTimeout++
+		} else {
+			consecTimeout = 0
+		}
+		if consecTimeout >= maxConsecFail {
+			logger.Info("traceroute: 连续 %d 跳超时，停止追踪", maxConsecFail)
+			return
+		}
+	}
+
+	logger.Info("traceroute: 达到最大跳数 %d", maxHops)
+}
+
+// ---------- SSE 接口 ----------
+
+// handleTrace 处理 /api/trace?target=<ip_or_domain> 请求，以 SSE 流式返回每一跳。
+func (w *WebServer) handleTrace(rw http.ResponseWriter, r *http.Request) {
+	target := strings.TrimSpace(r.URL.Query().Get("target"))
+	if target == "" {
+		http.Error(rw, `{"error":"missing target parameter"}`, http.StatusBadRequest)
+		return
+	}
+
+	// 简单校验：只允许域名或 IP 格式
+	validTarget := regexp.MustCompile(`^[a-zA-Z0-9.\-:]+$`)
+	if !validTarget.MatchString(target) {
+		http.Error(rw, `{"error":"invalid target format"}`, http.StatusBadRequest)
+		return
+	}
+
+	// 如果是 IP，拒绝私有地址
+	if ip := net.ParseIP(target); ip != nil {
+		if isPrivateIP(target) {
+			http.Error(rw, `{"error":"private IP not allowed"}`, http.StatusForbidden)
+			return
+		}
+	}
+
+	// 速率限制
+	clientIP := getClientIP(r)
+	if !w.traceRL.Allow(clientIP) {
+		http.Error(rw, `{"error":"rate limit exceeded, try again later"}`, http.StatusTooManyRequests)
+		return
+	}
+
+	// 确保支持 Flush
+	flusher, ok := rw.(http.Flusher)
+	if !ok {
+		http.Error(rw, `{"error":"streaming not supported"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// SSE 头
+	rw.Header().Set("Content-Type", "text/event-stream")
+	rw.Header().Set("Cache-Control", "no-cache")
+	rw.Header().Set("Connection", "keep-alive")
+	rw.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// 总超时 60 秒
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+
+	hopCh := make(chan TracerouteHop, 5)
+
+	// 解析目标 IP（用于最终结果）
+	resolvedIP := target
+	if net.ParseIP(target) == nil {
+		addrs, err := net.DefaultResolver.LookupHost(ctx, target)
+		if err != nil {
+			errJSON, _ := json.Marshal(TracerouteResult{Target: target, Done: true, Error: "DNS resolution failed: " + err.Error()})
+			fmt.Fprintf(rw, "data: %s\n\n", errJSON)
+			flusher.Flush()
+			return
+		}
+		for _, a := range addrs {
+			if parsed := net.ParseIP(a); parsed != nil && parsed.To4() != nil {
+				resolvedIP = a
+				break
+			}
+		}
+		// 解析后再次检查是否为私有 IP
+		if isPrivateIP(resolvedIP) {
+			errJSON, _ := json.Marshal(TracerouteResult{Target: target, Done: true, Error: "resolved to private IP, not allowed"})
+			fmt.Fprintf(rw, "data: %s\n\n", errJSON)
+			flusher.Flush()
+			return
+		}
+	}
+
+	logger.Info("traceroute: 客户端 %s 请求追踪 %s (%s)", clientIP, target, resolvedIP)
+
+	go runTraceroute(ctx, resolvedIP, w.geoCache, hopCh)
+
+	var hops []TracerouteHop
+	for hop := range hopCh {
+		hops = append(hops, hop)
+		data, _ := json.Marshal(hop)
+		fmt.Fprintf(rw, "data: %s\n\n", data)
+		flusher.Flush()
+	}
+
+	// 发送最终汇总
+	result := TracerouteResult{
+		Target:     target,
+		ResolvedIP: resolvedIP,
+		Hops:       hops,
+		Done:       true,
+	}
+	data, _ := json.Marshal(result)
+	fmt.Fprintf(rw, "data: %s\n\n", data)
+	flusher.Flush()
+}
+
+// ══════════════════════════════════════════════════════════
 //  程序入口
 // ══════════════════════════════════════════════════════════
 
@@ -1496,7 +1867,7 @@ func main() {
 	go dnsServer.ServeUDP()
 	go dnsServer.ServeTCP()
 
-	webServer := &WebServer{cfg: cfg, store: store, geoCache: geoCache}
+	webServer := &WebServer{cfg: cfg, store: store, geoCache: geoCache, traceRL: newTraceRateLimiter()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", webServer.handleIndex)
 	mux.HandleFunc("/api/info", webServer.handleInfo)
@@ -1505,6 +1876,7 @@ func main() {
 	mux.HandleFunc("/api/geo", webServer.handleGeo)
 	mux.HandleFunc("/api/leak", webServer.handleLeak)
 	mux.HandleFunc("/api/unlock", webServer.handleUnlock)
+	mux.HandleFunc("/api/trace", webServer.handleTrace)
 
 	logger.Info("HTTP 开始监听 %s", cfg.WebPort)
 	if err := http.ListenAndServe(cfg.WebPort, mux); err != nil {
