@@ -1,5 +1,4 @@
 import { createSignal, onMount, Show, For } from 'solid-js';
-import './styles/input.css';
 import { getDomain, randToken, sleep, geoToTags, isPrivateIP, DNS_TIMEOUT_MS, POLL_INTERVAL_MS } from './lib/api';
 import type { GeoInfo } from './lib/api';
 import TabNav from './components/TabNav';
