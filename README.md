@@ -114,21 +114,15 @@ DNS_DOMAIN=dns.example.com NS_IP=1.2.3.4 \
 
 > NS 记录让 `dns.example.com` 的权威 DNS 指向你的服务器。
 
-### Nginx 反代（可选）
+### Caddy 反代（可选）
 
-```nginx
-server {
-    listen 80;
-    server_name dns.example.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header Host $host;
-    }
+```
+dns.example.com {
+    reverse_proxy 127.0.0.1:8080
 }
 ```
+
+Caddy 自动申请 HTTPS 证书，无需额外配置。
 
 ---
 
