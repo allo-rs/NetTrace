@@ -10,8 +10,8 @@ export function getDomain(): string {
 }
 
 // ── Constants ────────────────────────────────────────────────────
-export const DNS_TIMEOUT_MS = 6000;
-export const POLL_INTERVAL_MS = 800;
+export const DNS_TIMEOUT_MS = 4000;
+export const POLL_INTERVAL_MS = 500;
 export const LEAK_PROBE_COUNT = 5;
 export const LEAK_TIMEOUT_MS = 10000;
 

@@ -87,8 +87,15 @@ export default function App() {
     let elapsed = 0; if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => { elapsed++; setProgress(Math.min(90, elapsed * (90 / (DNS_TIMEOUT_MS / 1000)))); }, 1000);
     const token = randToken(); const domain = getDomain(); const img = new Image(); img.src = `http://${token}.${domain}/probe.png?t=${Date.now()}`;
-    let data: any = null; const deadline = Date.now() + DNS_TIMEOUT_MS; await sleep(500);
-    while (Date.now() < deadline) { try { const res = await fetch(`/api/info?token=${token}`); data = await res.json(); if (data.found) break; } catch (e) { console.warn('[poll] fetch error:', e); } const remaining = deadline - Date.now(); if (remaining <= 0) break; await sleep(Math.min(POLL_INTERVAL_MS, remaining)); }
+    let data: any = null; let clientShown = false; const deadline = Date.now() + DNS_TIMEOUT_MS; await sleep(500);
+    while (Date.now() < deadline) {
+      try {
+        const res = await fetch(`/api/info?token=${token}`); data = await res.json();
+        if (!clientShown && data.client_ip) { setClientIP(data.client_ip); setClientGeo(data.client_geo || null); clientShown = true; }
+        if (data.found) break;
+      } catch (e) { console.warn('[poll] fetch error:', e); }
+      const remaining = deadline - Date.now(); if (remaining <= 0) break; await sleep(Math.min(POLL_INTERVAL_MS, remaining));
+    }
     if (!data || !data.found) { try { const res = await fetch(`/api/info?token=${token}`); data = await res.json(); } catch (_) {} }
     if (timerInterval) clearInterval(timerInterval); setProgress(100);
     if (!data) { setStatus('error'); setStatusText('检测失败'); setClientIP('请求失败'); setDnsIP('请求失败'); setRefreshDisabled(false); setRefreshSpin(false); return; }
