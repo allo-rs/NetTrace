@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -1241,15 +1242,25 @@ func (w *WebServer) handleInfo(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (w *WebServer) handleIndex(rw http.ResponseWriter, r *http.Request) {
+	// Serve static assets from frontend/dist/ (JS, CSS, etc.)
 	if r.URL.Path != "/" {
-		http.NotFound(rw, r)
-		return
+		fp := filepath.Join("frontend", "dist", filepath.Clean(r.URL.Path))
+		if info, err := os.Stat(fp); err == nil && !info.IsDir() {
+			http.ServeFile(rw, r, fp)
+			return
+		}
 	}
-	data, err := os.ReadFile("index.html")
+
+	// SPA fallback: serve index.html with domain injection
+	data, err := os.ReadFile("frontend/public/index.html")
 	if err != nil {
-		logger.Error("读取 index.html 失败: %v", err)
-		http.Error(rw, "index.html not found", 500)
-		return
+		// Fallback to legacy index.html in project root
+		data, err = os.ReadFile("index.html")
+		if err != nil {
+			logger.Error("读取 index.html 失败: %v", err)
+			http.Error(rw, "index.html not found", 500)
+			return
+		}
 	}
 	html := strings.ReplaceAll(string(data), "{{.Domain}}", w.cfg.Domain)
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")

@@ -23,7 +23,7 @@ NEXT_MAJOR := v$(shell echo $$(( $(_MAJOR) + 1 ))).0.0
 
 # ── 帮助 ────────────────────────────────────────────────────────
 .DEFAULT_GOAL := help
-.PHONY: help patch minor major release _do_release build build-all clean
+.PHONY: help patch minor major release _do_release build build-all frontend clean
 
 help:
 	@echo "当前版本: $(CURRENT)"
@@ -74,18 +74,24 @@ _do_release:
 	@git diff --quiet && git diff --cached --quiet \
 		|| (echo "错误：工作区有未提交的改动，请先 commit"; exit 1)
 	@echo ">>> 编译验证..."
+	@cd frontend && bun install --frozen-lockfile && bun run build.ts
 	@go build ./... || (echo "错误：编译失败，取消发布"; exit 1)
 	@echo ">>> $(CURRENT) → $(V)"
 	git tag $(V)
 	git push origin $(V)
 	@echo "✓ $(V) 已推送，等待 CI 构建完成"
 
+# ── 前端构建 ─────────────────────────────────────────────────────
+frontend:
+	cd frontend && bun install --frozen-lockfile && bun run build.ts
+	@echo "✓ 前端构建完成"
+
 # ── 本地构建 ─────────────────────────────────────────────────────
-build:
+build: frontend
 	go build -trimpath -ldflags="-s -w" -o $(BINARY) .
 	@echo "✓ 编译完成: ./$(BINARY)"
 
-build-all:
+build-all: frontend
 	GOOS=linux GOARCH=amd64  CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o $(BINARY)-linux-amd64 .
 	GOOS=linux GOARCH=arm64  CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o $(BINARY)-linux-arm64 .
 	@echo "✓ 交叉编译完成:"
@@ -94,4 +100,5 @@ build-all:
 # ── 清理 ─────────────────────────────────────────────────────────
 clean:
 	rm -f $(BINARY) $(BINARY)-linux-amd64 $(BINARY)-linux-arm64
+	rm -rf frontend/dist
 	@echo "✓ 清理完成"
