@@ -117,12 +117,12 @@ export default function SpeedSection() {
 
   function Metric(props: { icon: string; label: string; m: () => MetricState }) {
     return (
-      <div class={`speed-metric ${props.m().state}`}>
-        <div class="speed-metric-icon">{props.icon}</div>
-        <div class="speed-metric-label">{props.label}</div>
-        <div class={`speed-metric-value ${props.m().state === 'active' ? 'testing' : props.m().state === '' ? 'waiting' : ''}`}>
+      <div class={`bg-surface2 border rounded-lg px-3 py-3.5 text-center transition-colors duration-300 ${props.m().state === 'active' ? 'border-blue' : props.m().state === 'done' ? 'border-[rgba(63,185,80,0.3)]' : 'border-border-muted'}`}>
+        <div class="text-base mb-1.5">{props.icon}</div>
+        <div class="text-[11px] text-text-muted uppercase tracking-[0.5px] mb-1">{props.label}</div>
+        <div class={`font-mono text-[22px] font-semibold leading-tight ${props.m().state === 'active' ? 'text-blue animate-pulse-dot' : props.m().state === '' ? 'text-text-muted !text-sm' : 'text-text-bright'}`}>
           {props.m().state === 'done'
-            ? <>{props.m().value}<span class="speed-metric-unit">{props.m().unit}</span></>
+            ? <>{props.m().value}<span class="text-[11px] text-text-muted font-normal ml-0.5">{props.m().unit}</span></>
             : props.m().value}
         </div>
       </div>
@@ -130,32 +130,32 @@ export default function SpeedSection() {
   }
 
   return (
-    <div class="speed-section">
-      <div class="speed-header">
-        <div class="speed-header-left">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--blue)"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    <div class="mt-4 bg-surface border border-border rounded-[10px] overflow-hidden">
+      <div class="flex items-center justify-between px-[18px] py-3.5 gap-3">
+        <div class="flex items-center gap-2 font-medium text-[13px] text-text-bright">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           网速测试
         </div>
-        <button class="btn-speed" disabled={testing()} onClick={runSpeedTest}>{btnText()}</button>
+        <button class="bg-transparent border border-border rounded-md text-blue text-xs px-3.5 py-[5px] cursor-pointer whitespace-nowrap transition-colors duration-150 hover:not-disabled:bg-[rgba(88,166,255,0.08)] hover:not-disabled:border-[rgba(88,166,255,0.4)] disabled:opacity-40 disabled:cursor-not-allowed" disabled={testing()} onClick={runSpeedTest}>{btnText()}</button>
       </div>
       <Show when={bodyVisible()}>
-        <div class="speed-body">
+        <div class="px-[18px] pb-[18px]">
           <Show when={progressVisible()}>
-            <div class="speed-progress">
-              <div class="speed-progress-text"><div class="spinner"></div><span>{progressText()}</span></div>
-              <div class="speed-progress-bar-wrap"><div class="speed-progress-bar" style={{ width: `${progressWidth()}%` }}></div></div>
+            <div class="mb-3.5">
+              <div class="text-[11px] text-text-muted mb-1.5 flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 border-2 border-border border-t-blue rounded-full animate-spin"></span><span>{progressText()}</span></div>
+              <div class="h-[3px] bg-border-muted rounded-sm overflow-hidden"><div class="h-full bg-gradient-to-r from-blue to-purple rounded-sm transition-[width] duration-300" style={{ width: `${progressWidth()}%` }}></div></div>
             </div>
           </Show>
-          <div class="speed-metrics">
+          <div class="grid grid-cols-4 gap-3 max-[600px]:grid-cols-2">
             <Metric icon="🏓" label="延迟" m={ping} />
             <Metric icon="📊" label="抖动" m={jitter} />
             <Metric icon="⬇️" label="下载" m={down} />
             <Metric icon="⬆️" label="上传" m={up} />
           </div>
-          <Show when={errorVisible()}><div class="speed-error">{errorText()}</div></Show>
+          <Show when={errorVisible()}><div class="text-red text-xs py-2 text-center">{errorText()}</div></Show>
           <Show when={noteVisible()}>
-            <div class="speed-note">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div class="flex items-start gap-1.5 text-[11px] text-text-muted mt-3.5 leading-normal">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               <span>测速通过 Cloudflare 全球 CDN 边缘节点进行，结果反映您到最近 CF 节点的网络性能。实际体验可能因目标服务器不同而有差异。</span>
             </div>
           </Show>

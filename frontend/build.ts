@@ -1,4 +1,10 @@
 import { readFileSync } from "fs";
+import { execSync } from "child_process";
+
+// Build Tailwind CSS
+execSync("bunx @tailwindcss/cli -i src/styles/input.css -o dist/index.css --minify", {
+  stdio: "inherit",
+});
 
 const solidPlugin: import("bun").BunPlugin = {
   name: "solid",

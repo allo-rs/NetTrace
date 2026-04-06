@@ -151,32 +151,32 @@ export default function FPSection() {
   }
 
   return (
-    <div class="fp-section">
-      <div class="fp-header">
-        <div class="fp-header-left">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--green)">
+    <div class="mt-4 bg-surface border border-border rounded-[10px] overflow-hidden">
+      <div class="flex items-center justify-between px-[18px] py-3.5 gap-3">
+        <div class="flex items-center gap-2 font-medium text-[13px] text-text-bright">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green">
             <path d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 0 0 8 11a4 4 0 1 1 8 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0 0 15.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 0 0 8.08 3.488M3 3l18 18"/>
           </svg>
           HTTP / 浏览器指纹
         </div>
-        <button class="btn-fp" disabled={testing()} onClick={runFingerprintTest}>{btnText()}</button>
+        <button class="bg-transparent border border-border rounded-md text-green text-xs px-3.5 py-[5px] cursor-pointer whitespace-nowrap transition-colors duration-150 hover:not-disabled:bg-[rgba(63,185,80,0.08)] hover:not-disabled:border-[rgba(63,185,80,0.4)] disabled:opacity-40 disabled:cursor-not-allowed" disabled={testing()} onClick={runFingerprintTest}>{btnText()}</button>
       </div>
       <Show when={bodyVisible()}>
-        <div class="fp-body">
-          <div class="fp-group">
-            <div class="fp-group-title">🌐 浏览器指纹</div>
+        <div class="px-[18px] pb-4">
+          <div class="mb-3.5">
+            <div class="text-[11px] text-text-muted uppercase tracking-[0.5px] mb-2 font-medium">🌐 浏览器指纹</div>
             <Show when={browserRows().length > 0} fallback={
-              <table class="fp-table"><tbody><tr><td colSpan={2} style="color:var(--text-muted)">采集中…</td></tr></tbody></table>
+              <table class="w-full border-collapse text-xs"><tbody><tr><td colSpan={2} style="color:var(--text-muted)">采集中…</td></tr></tbody></table>
             }>
-              <table class="fp-table">
+              <table class="w-full border-collapse text-xs">
                 <tbody>
                   <For each={browserRows()}>
                     {(row) => (
                       <tr>
-                        <td>{row[0]}</td>
-                        <td>
+                        <td class="py-[5px] px-2 border-b border-border-muted align-top text-text-muted whitespace-nowrap w-[140px] font-medium last:border-b-0">{row[0]}</td>
+                        <td class="py-[5px] px-2 border-b border-border-muted align-top font-mono text-text-bright break-all last:border-b-0">
                           {isHashField(row[0])
-                            ? <span class="fp-hash">{row[1]}</span>
+                            ? <span class="font-mono text-[11px] text-purple bg-surface2 px-2 py-[2px] rounded inline-block">{row[1]}</span>
                             : row[1]
                           }
                         </td>
@@ -187,22 +187,22 @@ export default function FPSection() {
               </table>
             </Show>
           </div>
-          <div class="fp-group">
-            <div class="fp-group-title">📡 服务端收到的 HTTP 请求头</div>
+          <div class="mb-3.5">
+            <div class="text-[11px] text-text-muted uppercase tracking-[0.5px] mb-2 font-medium">📡 服务端收到的 HTTP 请求头</div>
             <Show when={headerError()}>
-              <table class="fp-table"><tbody><tr><td colSpan={2} style="color:var(--red)">{headerError()}</td></tr></tbody></table>
+              <table class="w-full border-collapse text-xs"><tbody><tr><td colSpan={2} style="color:var(--red)">{headerError()}</td></tr></tbody></table>
             </Show>
             <Show when={headerLoading() && !headerError()}>
-              <table class="fp-table"><tbody><tr><td colSpan={2} style="color:var(--text-muted)">请求中…</td></tr></tbody></table>
+              <table class="w-full border-collapse text-xs"><tbody><tr><td colSpan={2} style="color:var(--text-muted)">请求中…</td></tr></tbody></table>
             </Show>
             <Show when={headerRows().length > 0 && !headerError()}>
-              <table class="fp-table">
+              <table class="w-full border-collapse text-xs">
                 <tbody>
                   <For each={headerRows()}>
                     {(row) => (
                       <tr>
-                        <td>{row[0]}</td>
-                        <td>{row[1]}</td>
+                        <td class="py-[5px] px-2 border-b border-border-muted align-top text-text-muted whitespace-nowrap w-[140px] font-medium last:border-b-0">{row[0]}</td>
+                        <td class="py-[5px] px-2 border-b border-border-muted align-top font-mono text-text-bright break-all last:border-b-0">{row[1]}</td>
                       </tr>
                     )}
                   </For>
@@ -211,8 +211,8 @@ export default function FPSection() {
             </Show>
           </div>
           <Show when={noteVisible()}>
-            <div class="fp-note">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px">
+            <div class="flex items-start gap-1.5 text-[11px] text-text-muted mt-3 leading-normal">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 mt-0.5">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
               <span>浏览器指纹基于本地 JavaScript 采集，HTTP 头由服务端返回。Canvas/WebGL 哈希可用于跨站追踪识别。</span>

@@ -70,7 +70,7 @@ export default function LeakSection(props: LeakSectionProps) {
 
   function renderLeakResult(data: any) {
     if (!data) {
-      setResultHTML('<div class="leak-no-capture">请求失败，请稍后重试</div>');
+      setResultHTML('<div class="text-xs text-text-muted italic py-2 text-center">请求失败，请稍后重试</div>');
       return;
     }
 
@@ -83,41 +83,41 @@ export default function LeakSection(props: LeakSectionProps) {
     const total = data.total_count;
     const unique: string[] = data.unique_resolvers || [];
 
-    let badgeClass: string, badgeIcon: string, badgeText: string;
+    let badgeCls: string, badgeIcon: string, badgeText: string;
     if (captured === 0) {
-      badgeClass = 'partial'; badgeIcon = '⚠'; badgeText = '未能捕获任何探针（可能启用了 DoH）';
+      badgeCls = 'bg-[rgba(227,179,65,0.08)] border border-[rgba(227,179,65,0.3)] text-yellow'; badgeIcon = '⚠'; badgeText = '未能捕获任何探针（可能启用了 DoH）';
     } else if (data.leaked) {
-      badgeClass = 'leaked'; badgeIcon = '✕'; badgeText = `检测到 ${unique.length} 个不同 DNS 解析器，存在泄漏风险`;
+      badgeCls = 'bg-[rgba(248,81,73,0.08)] border border-[rgba(248,81,73,0.3)] text-red'; badgeIcon = '✕'; badgeText = `检测到 ${unique.length} 个不同 DNS 解析器，存在泄漏风险`;
     } else if (captured < total) {
-      badgeClass = 'partial'; badgeIcon = '△'; badgeText = `仅捕获 ${captured}/${total} 个探针，结果不完整`;
+      badgeCls = 'bg-[rgba(227,179,65,0.08)] border border-[rgba(227,179,65,0.3)] text-yellow'; badgeIcon = '△'; badgeText = `仅捕获 ${captured}/${total} 个探针，结果不完整`;
     } else {
-      badgeClass = 'safe'; badgeIcon = '✓'; badgeText = '所有探针均通过同一 DNS 解析器，未发现泄漏';
+      badgeCls = 'bg-[rgba(63,185,80,0.08)] border border-[rgba(63,185,80,0.3)] text-green'; badgeIcon = '✓'; badgeText = '所有探针均通过同一 DNS 解析器，未发现泄漏';
     }
 
     let resolversHTML = '';
     if (unique.length > 0) {
-      resolversHTML = '<div class="leak-resolvers">' +
+      resolversHTML = '<div class="flex flex-col gap-2">' +
         unique.map((ip: string, i: number) => {
           const result = data.results.find((r: any) => r.resolver_ip === ip);
           const geo = result && result.resolver_geo;
           const tags = geo ? geoToTags(geo).map(t =>
-            `<span class="tag ${t.cls}">${t.text}</span>`
+            `<span class="inline-flex items-center px-[9px] py-[3px] rounded-full text-[11px] border whitespace-nowrap ${t.cls === 'loc' ? 'bg-[rgba(88,166,255,0.07)] border-[rgba(88,166,255,0.22)] text-blue' : t.cls === 'cty' ? 'bg-[rgba(63,185,80,0.07)] border-[rgba(63,185,80,0.22)] text-green' : 'bg-[rgba(188,140,255,0.07)] border-[rgba(188,140,255,0.22)] text-purple'}">${t.text}</span>`
           ).join('') : '';
-          return `<div class="leak-resolver-item">
-            <div class="leak-resolver-idx">${i + 1}</div>
-            <div class="leak-resolver-info">
-              <div class="leak-resolver-ip">${ip}</div>
-              <div class="tags" style="min-height:unset">${tags}</div>
+          return `<div class="flex items-start gap-2.5 px-3 py-2.5 bg-surface border border-border rounded-lg">
+            <div class="w-[18px] h-[18px] rounded-full bg-surface2 border border-border flex items-center justify-center font-mono text-[9px] text-text-muted shrink-0 mt-[1px]">${i + 1}</div>
+            <div class="flex-1 min-w-0">
+              <div class="font-mono text-[13px] text-purple font-medium mb-[5px] break-all">${ip}</div>
+              <div class="flex flex-wrap gap-1.5" style="min-height:unset">${tags}</div>
             </div>
           </div>`;
         }).join('') +
       '</div>';
     } else {
-      resolversHTML = '<div class="leak-no-capture">未捕获到任何 DNS 解析器 IP</div>';
+      resolversHTML = '<div class="text-xs text-text-muted italic py-2 text-center">未捕获到任何 DNS 解析器 IP</div>';
     }
 
     setResultHTML(`
-      <div class="leak-result-badge ${badgeClass} fade-in">
+      <div class="inline-flex items-center gap-[7px] px-3 py-[5px] rounded-full text-xs font-medium mb-3.5 animate-fade-in ${badgeCls}">
         <span>${badgeIcon}</span>
         <span>${badgeText}</span>
       </div>
@@ -126,23 +126,23 @@ export default function LeakSection(props: LeakSectionProps) {
   }
 
   return (
-    <div class="leak-section">
-      <div class="leak-header">
-        <div class="leak-header-left">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--purple)">
+    <div class="mt-6 border border-border-muted rounded-[10px] overflow-hidden">
+      <div class="flex items-center justify-between px-[18px] py-[13px] bg-surface">
+        <div class="flex items-center gap-2 text-[13px] font-medium text-text">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-purple">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           </svg>
           DNS 泄漏检测
         </div>
-        <button class="btn-leak" disabled={testing()} onClick={runLeakTest}>{btnText()}</button>
+        <button class="px-4 py-1.5 border border-border rounded-md bg-transparent text-text text-xs font-sans cursor-pointer transition-colors duration-200 shrink-0 hover:not-disabled:border-purple hover:not-disabled:text-purple hover:not-disabled:bg-[rgba(188,140,255,0.06)] disabled:opacity-40 disabled:cursor-not-allowed" disabled={testing()} onClick={runLeakTest}>{btnText()}</button>
       </div>
       <Show when={bodyVisible()}>
-        <div class="leak-body">
+        <div class="px-[18px] py-4 pt-4 pb-[18px] bg-bg border-t border-border-muted">
           <Show when={progressVisible()}>
-            <div class="leak-progress">
+            <div class="flex items-center gap-2.5 text-xs text-text-muted mb-3">
               <span>{progressText()}</span>
-              <div class="leak-progress-bar-wrap">
-                <div class="leak-progress-bar" style={{ width: `${progressWidth()}%` }}></div>
+              <div class="flex-1 h-[3px] bg-border-muted rounded-sm overflow-hidden">
+                <div class="h-full bg-gradient-to-r from-purple to-blue rounded-sm transition-[width] duration-300 ease-in-out" style={{ width: `${progressWidth()}%` }}></div>
               </div>
             </div>
           </Show>

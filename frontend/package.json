@@ -6,8 +6,10 @@
   "devDependencies": {
     "@babel/core": "^7.29.0",
     "@babel/preset-typescript": "^7.28.5",
+    "@tailwindcss/cli": "^4.2.2",
     "@types/bun": "latest",
-    "babel-preset-solid": "^1.9.12"
+    "babel-preset-solid": "^1.9.12",
+    "tailwindcss": "^4.2.2"
   },
   "peerDependencies": {
     "typescript": "^5"

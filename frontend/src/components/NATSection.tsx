@@ -118,45 +118,55 @@ export default function NATSection() {
 
       const info = NAT_TYPES[natType]!;
 
+      // Badge color mapping
+      const badgeColors: Record<string, string> = {
+        open: 'bg-[rgba(63,185,80,0.1)] text-green border border-[rgba(63,185,80,0.25)]',
+        fullcone: 'bg-[rgba(63,185,80,0.1)] text-green border border-[rgba(63,185,80,0.25)]',
+        restricted: 'bg-[rgba(227,179,65,0.1)] text-yellow border border-[rgba(227,179,65,0.25)]',
+        symmetric: 'bg-[rgba(248,81,73,0.1)] text-red border border-[rgba(248,81,73,0.2)]',
+        blocked: 'bg-[rgba(248,81,73,0.1)] text-red border border-[rgba(248,81,73,0.2)]',
+      };
+      const badgeCls = badgeColors[natType] || '';
+
       // Render result
       setResultHTML(`
-        <div class="nat-result">
-          <div class="nat-type-badge ${info.cls}">${info.icon} ${info.label}</div>
+        <div class="flex items-center gap-3 mb-3.5">
+          <div class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold ${badgeCls}">${info.icon} ${info.label}</div>
         </div>
-        <div class="nat-desc">${info.desc}</div>`);
+        <div class="text-xs text-text-muted mb-3 leading-normal">${info.desc}</div>`);
 
       // Render details
       let dHTML = '';
 
       if (mappedIP) {
         dHTML += `
-          <div class="nat-detail-card">
-            <div class="nat-detail-label">公网映射 IP</div>
-            <div class="nat-detail-value">${mappedIP}</div>
+          <div class="bg-surface2 border border-border-muted rounded-lg px-3.5 py-2.5">
+            <div class="text-[11px] text-text-muted uppercase tracking-[0.5px] mb-0.5">公网映射 IP</div>
+            <div class="font-mono text-xs text-text-bright break-all">${mappedIP}</div>
           </div>`;
       }
 
       if (mappedPort1 && mappedPort2) {
         dHTML += `
-          <div class="nat-detail-card">
-            <div class="nat-detail-label">端口映射</div>
-            <div class="nat-detail-value">STUN1: ${mappedPort1} / STUN2: ${mappedPort2}${mappedPort1 === mappedPort2 ? ' (一致)' : ' (不一致)'}</div>
+          <div class="bg-surface2 border border-border-muted rounded-lg px-3.5 py-2.5">
+            <div class="text-[11px] text-text-muted uppercase tracking-[0.5px] mb-0.5">端口映射</div>
+            <div class="font-mono text-xs text-text-bright break-all">STUN1: ${mappedPort1} / STUN2: ${mappedPort2}${mappedPort1 === mappedPort2 ? ' (一致)' : ' (不一致)'}</div>
           </div>`;
       }
 
       const localIPs = uniqueHostIPs.filter(ip => !isPublicIP(ip));
       if (localIPs.length > 0) {
         dHTML += `
-          <div class="nat-detail-card">
-            <div class="nat-detail-label">本地接口</div>
-            <div class="nat-detail-value">${localIPs.join(', ')}</div>
+          <div class="bg-surface2 border border-border-muted rounded-lg px-3.5 py-2.5">
+            <div class="text-[11px] text-text-muted uppercase tracking-[0.5px] mb-0.5">本地接口</div>
+            <div class="font-mono text-xs text-text-bright break-all">${localIPs.join(', ')}</div>
           </div>`;
       }
 
       dHTML += `
-        <div class="nat-detail-card">
-          <div class="nat-detail-label">候选地址统计</div>
-          <div class="nat-detail-value">Host: ${allHosts.length} / SRFLX: ${srflx1.length + srflx2.length}</div>
+        <div class="bg-surface2 border border-border-muted rounded-lg px-3.5 py-2.5">
+          <div class="text-[11px] text-text-muted uppercase tracking-[0.5px] mb-0.5">候选地址统计</div>
+          <div class="font-mono text-xs text-text-bright break-all">Host: ${allHosts.length} / SRFLX: ${srflx1.length + srflx2.length}</div>
         </div>`;
 
       setDetailsHTML(dHTML);
@@ -171,24 +181,24 @@ export default function NATSection() {
   }
 
   return (
-    <div class="nat-section">
-      <div class="nat-header">
-        <div class="nat-header-left">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--yellow)">
+    <div class="mt-4 bg-surface border border-border rounded-[10px] overflow-hidden">
+      <div class="flex items-center justify-between px-[18px] py-3.5 gap-3">
+        <div class="flex items-center gap-2 font-medium text-[13px] text-text-bright">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
           NAT 类型检测
         </div>
-        <button class="btn-nat" disabled={testing()} onClick={runNATTest}>{btnText()}</button>
+        <button class="bg-transparent border border-border rounded-md text-yellow text-xs px-3.5 py-[5px] cursor-pointer whitespace-nowrap transition-colors duration-150 hover:not-disabled:bg-[rgba(227,179,65,0.08)] hover:not-disabled:border-[rgba(227,179,65,0.4)] disabled:opacity-40 disabled:cursor-not-allowed" disabled={testing()} onClick={runNATTest}>{btnText()}</button>
       </div>
       <Show when={bodyVisible()}>
-        <div class="nat-body">
+        <div class="px-[18px] pb-4">
           <div innerHTML={resultHTML()}></div>
-          <div class="nat-details" innerHTML={detailsHTML()}></div>
+          <div class="grid grid-cols-2 gap-2.5 max-[500px]:grid-cols-1" innerHTML={detailsHTML()}></div>
           <Show when={noteVisible()}>
-            <div class="nat-note">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px">
+            <div class="flex items-start gap-1.5 text-[11px] text-text-muted mt-3 leading-normal">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 mt-0.5">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
               <span>NAT 类型通过 WebRTC ICE 候选地址分析判断。对称型 NAT 可能影响 P2P 连接（如视频通话、游戏联机）。检测结果仅供参考。</span>

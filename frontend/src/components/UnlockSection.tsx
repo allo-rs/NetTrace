@@ -71,41 +71,41 @@ export default function UnlockSection() {
   }
 
   return (
-    <div class="leak-section">
-      <div class="leak-header">
-        <div class="leak-header-left">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--blue)">
+    <div class="mt-6 border border-border-muted rounded-[10px] overflow-hidden">
+      <div class="flex items-center justify-between px-[18px] py-[13px] bg-surface">
+        <div class="flex items-center gap-2 text-[13px] font-medium text-text">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue">
             <circle cx="12" cy="12" r="10"/>
             <line x1="2" y1="12" x2="22" y2="12"/>
             <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
           </svg>
           流媒体 &amp; 网络解锁检测
         </div>
-        <button class="btn-leak" disabled={testing()} onClick={runUnlockTest}>{btnText()}</button>
+        <button class="px-4 py-1.5 border border-border rounded-md bg-transparent text-text text-xs font-sans cursor-pointer transition-colors duration-200 shrink-0 hover:not-disabled:border-purple hover:not-disabled:text-purple hover:not-disabled:bg-[rgba(188,140,255,0.06)] disabled:opacity-40 disabled:cursor-not-allowed" disabled={testing()} onClick={runUnlockTest}>{btnText()}</button>
       </div>
       <Show when={bodyVisible()}>
         <div>
-          <div class="unlock-grid">
+          <div class="grid grid-cols-4 gap-2 px-[18px] py-4 pb-3.5 bg-bg border-t border-border-muted max-[600px]:grid-cols-2">
             <For each={results()}>
               {(r) => {
                 if (!r.done) {
                   return (
-                    <div class="unlock-card">
-                      <div class="unlock-svc">{r.service}</div>
-                      <div class="unlock-status">
-                        <div class="unlock-dot loading"></div>
+                    <div class="bg-surface border border-border rounded-lg px-[11px] py-2.5 flex flex-col gap-[5px] transition-colors duration-200">
+                      <div class="text-xs font-medium text-text whitespace-nowrap overflow-hidden text-ellipsis">{r.service}</div>
+                      <div class="flex items-center gap-[5px] text-[11px] text-text-muted">
+                        <div class="w-1.5 h-1.5 rounded-full shrink-0 bg-text-muted animate-pulse-dot"></div>
                         <span>检测中</span>
                       </div>
                     </div>
                   );
                 }
-                const dotClass = r.available ? 'ok' : (r.note === '连接超时' ? 'timeout' : 'fail');
+                const dotCls = r.available ? 'bg-green' : (r.note === '连接超时' ? 'bg-yellow' : 'bg-red');
                 const statusText = r.available ? '可访问' : (r.note || '无法访问');
                 return (
-                  <div class={`unlock-card ${r.available ? 'ok' : 'fail'} fade-in`}>
-                    <div class="unlock-svc">{r.service}</div>
-                    <div class="unlock-status">
-                      <div class={`unlock-dot ${dotClass}`}></div>
+                  <div class={`bg-surface border rounded-lg px-[11px] py-2.5 flex flex-col gap-[5px] transition-colors duration-200 animate-fade-in ${r.available ? 'border-[rgba(63,185,80,0.25)]' : 'border-[rgba(248,81,73,0.2)]'}`}>
+                    <div class="text-xs font-medium text-text whitespace-nowrap overflow-hidden text-ellipsis">{r.service}</div>
+                    <div class="flex items-center gap-[5px] text-[11px] text-text-muted">
+                      <div class={`w-1.5 h-1.5 rounded-full shrink-0 ${dotCls}`}></div>
                       <span>{statusText}</span>
                     </div>
                   </div>
@@ -113,8 +113,8 @@ export default function UnlockSection() {
               }}
             </For>
           </div>
-          <div class="unlock-note">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+          <div class="px-[18px] py-2 pb-3.5 bg-bg text-[11px] text-text-muted flex items-center gap-1.5">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
               <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
             检测基于您的浏览器网络（前端直连，无需服务器中转）

@@ -13,14 +13,14 @@ const TABS = [
 
 export default function TabNav(props: TabNavProps) {
   return (
-    <div class="tab-nav">
+    <div class="flex gap-0.5 bg-surface border border-border rounded-[10px] p-1 mt-4 mb-1">
       {TABS.map(tab => (
         <button
-          class={`tab-btn ${props.activeTab() === tab.id ? 'active' : ''}`}
+          class={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-[7px] font-sans text-xs font-medium cursor-pointer transition-all duration-200 whitespace-nowrap hover:text-text hover:bg-surface2 max-[500px]:text-[11px] max-[500px]:px-1.5 max-[500px]:py-2 max-[500px]:gap-1 ${props.activeTab() === tab.id ? 'bg-surface2 text-text-bright border border-border' : 'bg-transparent text-text-muted border border-transparent'}`}
           onClick={() => props.setActiveTab(tab.id)}
         >
-          <span class="tab-icon">{tab.icon}</span>
-          <span class="tab-label">{tab.label}</span>
+          <span class="text-sm max-[500px]:text-base">{tab.icon}</span>
+          <span class="max-[500px]:hidden">{tab.label}</span>
         </button>
       ))}
     </div>

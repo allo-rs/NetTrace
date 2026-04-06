@@ -60,7 +60,7 @@ export default function TraceSection(props: TraceSectionProps) {
     setErrorHTML('');
     setNoteVisible(false);
     setStatusColor('');
-    setStatusHTML(`<div class="spinner"></div> 正在追踪 ${t}…`);
+    setStatusHTML(`<span class="inline-block align-middle w-3 h-3 border-2 border-border border-t-green rounded-full animate-spin"></span> 正在追踪 ${t}…`);
 
     abortCtrl = new AbortController();
 
@@ -130,7 +130,7 @@ export default function TraceSection(props: TraceSectionProps) {
           setHops(prev => [...prev, hop]);
 
           // Update status
-          setStatusHTML(`<div class="spinner"></div> 正在追踪 ${t}… (${hopCount} 跳)`);
+          setStatusHTML(`<span class="inline-block align-middle w-3 h-3 border-2 border-border border-t-green rounded-full animate-spin"></span> 正在追踪 ${t}… (${hopCount} 跳)`);
 
           // Auto-scroll
           if (tableEndRef) {
@@ -160,26 +160,26 @@ export default function TraceSection(props: TraceSectionProps) {
   }
 
   return (
-    <div class="trace-section">
-      <div class="trace-header">
-        <div class="trace-header-left">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--green)">
+    <div class="mt-4 bg-surface border border-border rounded-[10px] overflow-hidden">
+      <div class="flex items-center justify-between px-[18px] py-3.5 gap-3">
+        <div class="flex items-center gap-2 font-medium text-[13px] text-text-bright">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
           </svg>
           路由追踪
         </div>
-        <div class="trace-input-row">
+        <div class="flex items-center gap-2">
           <input
             type="text"
-            class="trace-input"
+            class="bg-surface2 border border-border rounded-md text-text font-mono text-xs px-2.5 py-[5px] w-[180px] outline-none transition-colors duration-150 focus:border-blue placeholder:text-text-muted"
             placeholder="IP 或域名"
             spellcheck={false}
             value={target()}
             onInput={(e) => setTarget(e.currentTarget.value)}
             onKeyDown={handleKeyDown}
           />
-          <button class="btn-trace" disabled={tracing()} onClick={() => runTrace()}>{btnText()}</button>
-          <button class="btn-trace" disabled={tracing()} onClick={traceToClient} title="追踪到您的客户端 IP">
+          <button class="bg-transparent border border-border rounded-md text-green text-xs px-3.5 py-[5px] cursor-pointer whitespace-nowrap transition-colors duration-150 hover:not-disabled:bg-[rgba(63,185,80,0.08)] hover:not-disabled:border-[rgba(63,185,80,0.4)] disabled:opacity-40 disabled:cursor-not-allowed" disabled={tracing()} onClick={() => runTrace()}>{btnText()}</button>
+          <button class="bg-transparent border border-border rounded-md text-green text-xs px-3.5 py-[5px] cursor-pointer whitespace-nowrap transition-colors duration-150 hover:not-disabled:bg-[rgba(63,185,80,0.08)] hover:not-disabled:border-[rgba(63,185,80,0.4)] disabled:opacity-40 disabled:cursor-not-allowed" disabled={tracing()} onClick={traceToClient} title="追踪到您的客户端 IP">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
               <circle cx="12" cy="10" r="3"/>
@@ -189,19 +189,19 @@ export default function TraceSection(props: TraceSectionProps) {
         </div>
       </div>
       <Show when={bodyVisible()}>
-        <div class="trace-body">
-          <div class="trace-status" style={{ color: statusColor() || undefined }} innerHTML={statusHTML()}></div>
+        <div class="px-[18px] pb-4">
+          <div class="text-xs text-text-muted mb-2.5 flex items-center gap-1.5" style={{ color: statusColor() || undefined }} innerHTML={statusHTML()}></div>
           <Show when={errorHTML()}>
-            <div class="trace-error">{errorHTML()}</div>
+            <div class="text-red text-xs py-2">{errorHTML()}</div>
           </Show>
           <Show when={hops().length > 0}>
-            <table class="trace-table">
+            <table class="w-full border-collapse text-xs">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>IP 地址</th>
-                  <th>延迟</th>
-                  <th>归属地</th>
+                  <th class="text-left text-text-muted font-medium px-2 py-1.5 border-b border-border text-[11px] uppercase tracking-[0.5px]">#</th>
+                  <th class="text-left text-text-muted font-medium px-2 py-1.5 border-b border-border text-[11px] uppercase tracking-[0.5px]">IP 地址</th>
+                  <th class="text-left text-text-muted font-medium px-2 py-1.5 border-b border-border text-[11px] uppercase tracking-[0.5px]">延迟</th>
+                  <th class="text-left text-text-muted font-medium px-2 py-1.5 border-b border-border text-[11px] uppercase tracking-[0.5px]">归属地</th>
                 </tr>
               </thead>
               <tbody>
@@ -209,11 +209,11 @@ export default function TraceSection(props: TraceSectionProps) {
                   {(hop) => {
                     if (hop.timeout) {
                       return (
-                        <tr class="timeout">
-                          <td class="trace-hop-num">{hop.hop}</td>
-                          <td class="trace-hop-ip">*</td>
-                          <td class="trace-hop-rtt">*</td>
-                          <td class="trace-hop-geo"><span class="tag" style="opacity:0.5">超时</span></td>
+                        <tr class="text-text-muted italic">
+                          <td class="px-2 py-[7px] border-b border-border-muted align-top font-mono min-w-7">{hop.hop}</td>
+                          <td class="px-2 py-[7px] border-b border-border-muted align-top font-mono">*</td>
+                          <td class="px-2 py-[7px] border-b border-border-muted align-top font-mono whitespace-nowrap">*</td>
+                          <td class="px-2 py-[7px] border-b border-border-muted align-top"><span class="inline-flex items-center px-1.5 py-[1px] rounded-full text-[10px] border whitespace-nowrap opacity-50 border-border text-text-muted">超时</span></td>
                         </tr>
                       );
                     }
@@ -222,14 +222,14 @@ export default function TraceSection(props: TraceSectionProps) {
                       : '';
                     const geoTags = hop.geo ? geoToTags(hop.geo) : [];
                     return (
-                      <tr class={hop.is_dest ? 'dest' : ''}>
-                        <td class="trace-hop-num">{hop.hop}</td>
-                        <td class="trace-hop-ip">{hop.ip}{hop.is_dest ? ' ★' : ''}</td>
-                        <td class="trace-hop-rtt">{rttStr}</td>
-                        <td class="trace-hop-geo">
+                      <tr class={hop.is_dest ? 'text-green' : ''}>
+                        <td class="px-2 py-[7px] border-b border-border-muted align-top font-mono text-text-muted min-w-7">{hop.hop}</td>
+                        <td class="px-2 py-[7px] border-b border-border-muted align-top font-mono text-text-bright">{hop.ip}{hop.is_dest ? ' ★' : ''}</td>
+                        <td class="px-2 py-[7px] border-b border-border-muted align-top font-mono text-yellow whitespace-nowrap">{rttStr}</td>
+                        <td class="px-2 py-[7px] border-b border-border-muted align-top">
                           {geoTags.length > 0
-                            ? geoTags.map(t => <span class={`tag ${t.cls}`}>{t.text}</span>)
-                            : <span style="color:var(--text-muted)">—</span>
+                            ? geoTags.map(t => <span class={`inline-flex items-center px-1.5 py-[1px] rounded-full text-[10px] border whitespace-nowrap ${t.cls === 'loc' ? 'bg-[rgba(88,166,255,0.07)] border-[rgba(88,166,255,0.22)] text-blue' : t.cls === 'cty' ? 'bg-[rgba(63,185,80,0.07)] border-[rgba(63,185,80,0.22)] text-green' : 'bg-[rgba(188,140,255,0.07)] border-[rgba(188,140,255,0.22)] text-purple'}`}>{t.text}</span>)
+                            : <span class="text-text-muted">—</span>
                           }
                         </td>
                       </tr>
@@ -241,8 +241,8 @@ export default function TraceSection(props: TraceSectionProps) {
             </table>
           </Show>
           <Show when={noteVisible()}>
-            <div class="trace-note">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px">
+            <div class="flex items-start gap-1.5 text-[11px] text-text-muted mt-2.5 leading-normal">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 mt-0.5">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
               <span>路由追踪从服务端发起，显示的是服务器到目标 IP 的网络路径。部分云服务器可能屏蔽 ICMP，导致中间跳显示超时。</span>

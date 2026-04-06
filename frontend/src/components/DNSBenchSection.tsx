@@ -51,7 +51,7 @@ export default function DNSBenchSection() {
     setSorted(false);
     setNoteVisible(false);
     setStatusColor('');
-    setStatusHTML('<div class="spinner"></div> 正在测试各 DNS 解析器…');
+    setStatusHTML('<span class="inline-block align-middle w-3.5 h-3.5 border-2 border-border border-t-purple rounded-full animate-spin"></span> 正在测试各 DNS 解析器…');
 
     abortCtrl = new AbortController();
     let rank = 0;
@@ -124,7 +124,7 @@ export default function DNSBenchSection() {
             status: data.status || (data.avg > 0 ? 'ok' : 'timeout'),
           };
           setResults(prev => [...prev, item]);
-          setStatusHTML(`<div class="spinner"></div> 已测试 ${rank} 个解析器…`);
+          setStatusHTML(`<span class="inline-block align-middle w-3.5 h-3.5 border-2 border-border border-t-purple rounded-full animate-spin"></span> 已测试 ${rank} 个解析器…`);
         }
       }
 
@@ -144,52 +144,54 @@ export default function DNSBenchSection() {
   }
 
   return (
-    <div class="dnsbench-section">
-      <div class="dnsbench-header">
-        <div class="dnsbench-header-left">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--purple)">
+    <div class="mt-4 bg-surface border border-border rounded-[10px] overflow-hidden">
+      <div class="flex items-center justify-between px-[18px] py-3.5 gap-3">
+        <div class="flex items-center gap-2 font-medium text-[13px] text-text-bright">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-purple">
             <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
           </svg>
           DNS 基准测试
         </div>
-        <button class="btn-dnsbench" disabled={testing()} onClick={runDNSBench}>{btnText()}</button>
+        <button class="bg-transparent border border-border rounded-md text-purple text-xs px-3.5 py-[5px] cursor-pointer whitespace-nowrap transition-colors duration-150 hover:not-disabled:bg-[rgba(188,140,255,0.08)] hover:not-disabled:border-[rgba(188,140,255,0.4)] disabled:opacity-40 disabled:cursor-not-allowed" disabled={testing()} onClick={runDNSBench}>{btnText()}</button>
       </div>
       <Show when={bodyVisible()}>
-        <div class="dnsbench-body">
-          <div class="dnsbench-status" style={{ color: statusColor() || undefined }} innerHTML={statusHTML()}></div>
+        <div class="px-[18px] pb-4">
+          <div class="text-xs text-text-muted mb-2.5 flex items-center gap-1.5" style={{ color: statusColor() || undefined }} innerHTML={statusHTML()}></div>
           <Show when={results().length > 0}>
-            <table class="dnsbench-table">
+            <table class="w-full border-collapse text-xs">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>解析器</th>
-                  <th>平均延迟</th>
-                  <th>最小</th>
-                  <th>最大</th>
-                  <th>丢包</th>
-                  <th class="dnsbench-bar-cell">速度</th>
+                  <th class="text-left text-text-muted font-medium px-2 py-1.5 border-b border-border text-[11px] uppercase tracking-[0.5px]">#</th>
+                  <th class="text-left text-text-muted font-medium px-2 py-1.5 border-b border-border text-[11px] uppercase tracking-[0.5px]">解析器</th>
+                  <th class="text-left text-text-muted font-medium px-2 py-1.5 border-b border-border text-[11px] uppercase tracking-[0.5px]">平均延迟</th>
+                  <th class="text-left text-text-muted font-medium px-2 py-1.5 border-b border-border text-[11px] uppercase tracking-[0.5px]">最小</th>
+                  <th class="text-left text-text-muted font-medium px-2 py-1.5 border-b border-border text-[11px] uppercase tracking-[0.5px]">最大</th>
+                  <th class="text-left text-text-muted font-medium px-2 py-1.5 border-b border-border text-[11px] uppercase tracking-[0.5px]">丢包</th>
+                  <th class="text-left text-text-muted font-medium px-2 py-1.5 border-b border-border text-[11px] uppercase tracking-[0.5px] w-[120px]">速度</th>
                 </tr>
               </thead>
               <tbody>
                 <For each={results()}>
                   {(item, index) => {
                     const cls = rttClass(item.avg);
+                    const rttColor = cls === 'fast' ? 'text-green' : cls === 'medium' ? 'text-yellow' : cls === 'slow' ? 'text-red' : 'text-text-muted italic';
+                    const barColor = cls === 'fast' ? 'bg-green' : cls === 'medium' ? 'bg-yellow' : 'bg-red';
                     const barWidth = () =>
                       sorted() && item.avg > 0 ? Math.max(5, (item.avg / maxRTT()) * 100) : 0;
                     return (
                       <tr>
-                        <td class="dnsbench-rank">{index() + 1}</td>
-                        <td>
-                          <span class="dnsbench-name">{item.name}</span><br/>
-                          <span class="dnsbench-ip">{item.ip}</span>
+                        <td class="px-2 py-2 border-b border-border-muted align-middle font-mono text-[11px] text-text-muted min-w-5">{index() + 1}</td>
+                        <td class="px-2 py-2 border-b border-border-muted align-middle">
+                          <span class="font-medium text-text-bright">{item.name}</span><br/>
+                          <span class="font-mono text-text-muted text-[11px]">{item.ip}</span>
                         </td>
-                        <td class={`dnsbench-rtt ${cls}`}>{item.avg > 0 ? item.avg.toFixed(1) + ' ms' : '超时'}</td>
-                        <td class={`dnsbench-rtt ${rttClass(item.min)}`}>{item.min > 0 ? item.min.toFixed(1) : '—'}</td>
-                        <td class={`dnsbench-rtt ${rttClass(item.max)}`}>{item.max > 0 ? item.max.toFixed(1) : '—'}</td>
-                        <td class={`dnsbench-rtt ${item.loss > 0 ? 'slow' : ''}`}>{item.loss}/3</td>
-                        <td class="dnsbench-bar-cell">
-                          <div class="dnsbench-bar-wrap">
-                            <div class={`dnsbench-bar ${cls}`} style={{ width: `${barWidth()}%` }}></div>
+                        <td class={`px-2 py-2 border-b border-border-muted align-middle font-mono whitespace-nowrap ${rttColor}`}>{item.avg > 0 ? item.avg.toFixed(1) + ' ms' : '超时'}</td>
+                        <td class={`px-2 py-2 border-b border-border-muted align-middle font-mono whitespace-nowrap ${item.min > 0 ? (rttClass(item.min) === 'fast' ? 'text-green' : rttClass(item.min) === 'medium' ? 'text-yellow' : 'text-red') : 'text-text-muted'}`}>{item.min > 0 ? item.min.toFixed(1) : '—'}</td>
+                        <td class={`px-2 py-2 border-b border-border-muted align-middle font-mono whitespace-nowrap ${item.max > 0 ? (rttClass(item.max) === 'fast' ? 'text-green' : rttClass(item.max) === 'medium' ? 'text-yellow' : 'text-red') : 'text-text-muted'}`}>{item.max > 0 ? item.max.toFixed(1) : '—'}</td>
+                        <td class={`px-2 py-2 border-b border-border-muted align-middle font-mono whitespace-nowrap ${item.loss > 0 ? 'text-red' : ''}`}>{item.loss}/3</td>
+                        <td class="px-2 py-2 border-b border-border-muted align-middle w-[120px]">
+                          <div class="h-1.5 bg-border-muted rounded-sm overflow-hidden">
+                            <div class={`h-full rounded-sm transition-[width] duration-300 ${barColor}`} style={{ width: `${barWidth()}%` }}></div>
                           </div>
                         </td>
                       </tr>
@@ -200,8 +202,8 @@ export default function DNSBenchSection() {
             </table>
           </Show>
           <Show when={noteVisible()}>
-            <div class="dnsbench-note">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px">
+            <div class="flex items-start gap-1.5 text-[11px] text-text-muted mt-3 leading-normal">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 mt-0.5">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
               <span>DNS 查询从服务端发起，结果反映服务器到各 DNS 解析器的延迟。您本地到各解析器的延迟可能不同。</span>

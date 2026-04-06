@@ -76,8 +76,8 @@ function renderIPTypeResults(r: Record<string, any>): string {
   const cf = r.cf || {};
 
   const cell = (val: string, err?: string) => {
-    if (err) return `<td class="iptype-pending">❌ ${escapeHTML(err)}</td>`;
-    return `<td>${val || '<span class="iptype-pending">—</span>'}</td>`;
+    if (err) return `<td class="text-text-muted italic">❌ ${escapeHTML(err)}</td>`;
+    return `<td>${val || '<span class="text-text-muted italic">—</span>'}</td>`;
   };
 
   // Consistency check
@@ -91,9 +91,9 @@ function renderIPTypeResults(r: Record<string, any>): string {
 
   // Type/proxy display
   const typeIcons: Record<string, string> = { residential: '🏠', datacenter: '🖥️', vpn: '🛡️', mobile: '📱' };
-  const typeColors: Record<string, string> = { residential: 'tag-residential', datacenter: 'tag-datacenter', vpn: 'tag-vpn', mobile: 'tag-mobile' };
+  const typeColors: Record<string, string> = { residential: 'bg-[#22c55e]', datacenter: 'bg-[#ef4444]', vpn: 'bg-[#f59e0b]', mobile: 'bg-[#3b82f6]' };
   const icon = typeIcons[local.rawType] || '❓';
-  const tagClass = typeColors[local.rawType] || '';
+  const tagBg = typeColors[local.rawType] || '';
 
   const scoreColor = (local.score || 0) >= 70 ? '#22c55e' : (local.score || 0) >= 40 ? '#f59e0b' : '#ef4444';
   const scoreLabel = (local.score || 0) >= 70 ? '优质 IP' : (local.score || 0) >= 40 ? '一般' : '低质量 / 高风险';
@@ -103,17 +103,17 @@ function renderIPTypeResults(r: Record<string, any>): string {
   // Top summary
   if (!local.error) {
     html += `
-      <div class="iptype-badge">${icon} <span class="tag ${tagClass}">${escapeHTML(local.type)}</span></div>
-      <div class="iptype-score-bar"><div class="iptype-score-fill" style="width:${local.score}%;background:${scoreColor}"></div></div>
-      <div class="iptype-score-label">IP 质量评分: <strong>${local.score}/100</strong> — ${scoreLabel}</div>
+      <div class="inline-flex items-center gap-1.5 text-[22px] font-bold mb-3.5">${icon} <span class="text-[11px] font-semibold px-2.5 py-[3px] rounded-full text-white ${tagBg}">${escapeHTML(local.type)}</span></div>
+      <div class="h-2 rounded bg-bg mb-1.5 overflow-hidden"><div class="h-full rounded transition-[width] duration-[600ms] ease-in-out" style="width:${local.score}%;background:${scoreColor}"></div></div>
+      <div class="text-[11px] text-text-muted mb-3.5">IP 质量评分: <strong>${local.score}/100</strong> — ${scoreLabel}</div>
     `;
   }
 
   // Multi-source comparison table
-  html += `<div class="iptype-compare"><table>
-    <tr><th>数据源</th><th>IP 地址</th><th>国家</th><th>城市</th><th>ASN / ISP</th><th>类型/代理</th></tr>
+  html += `<div class="mt-4 overflow-x-auto"><table class="w-full border-collapse text-[11px]">
+    <tr><th class="text-left px-2.5 py-2 font-semibold text-text-muted bg-bg border-b-2 border-border whitespace-nowrap text-[10px] uppercase tracking-[0.5px]">数据源</th><th class="text-left px-2.5 py-2 font-semibold text-text-muted bg-bg border-b-2 border-border whitespace-nowrap text-[10px] uppercase tracking-[0.5px]">IP 地址</th><th class="text-left px-2.5 py-2 font-semibold text-text-muted bg-bg border-b-2 border-border whitespace-nowrap text-[10px] uppercase tracking-[0.5px]">国家</th><th class="text-left px-2.5 py-2 font-semibold text-text-muted bg-bg border-b-2 border-border whitespace-nowrap text-[10px] uppercase tracking-[0.5px]">城市</th><th class="text-left px-2.5 py-2 font-semibold text-text-muted bg-bg border-b-2 border-border whitespace-nowrap text-[10px] uppercase tracking-[0.5px]">ASN / ISP</th><th class="text-left px-2.5 py-2 font-semibold text-text-muted bg-bg border-b-2 border-border whitespace-nowrap text-[10px] uppercase tracking-[0.5px]">类型/代理</th></tr>
     <tr>
-      <td class="src-name">🗄️ 本站 MaxMind</td>
+      <td class="px-2.5 py-[7px] border-b border-border text-text align-middle font-semibold whitespace-nowrap text-cyan">🗄️ 本站 MaxMind</td>
       ${cell(local.error ? '' : escapeHTML(local.ip), local.error)}
       ${cell(local.error ? '' : escapeHTML(local.country), local.error)}
       ${cell(local.error ? '' : escapeHTML(local.city), local.error)}
@@ -121,7 +121,7 @@ function renderIPTypeResults(r: Record<string, any>): string {
       ${cell(local.error ? '' : escapeHTML(local.type), local.error)}
     </tr>
     <tr>
-      <td class="src-name">ℹ️ ipinfo.io</td>
+      <td class="px-2.5 py-[7px] border-b border-border text-text align-middle font-semibold whitespace-nowrap text-cyan">ℹ️ ipinfo.io</td>
       ${cell(ipinfo.error ? '' : escapeHTML(ipinfo.ip), ipinfo.error)}
       ${cell(ipinfo.error ? '' : escapeHTML(ipinfo.country), ipinfo.error)}
       ${cell(ipinfo.error ? '' : escapeHTML(ipinfo.city), ipinfo.error)}
@@ -129,7 +129,7 @@ function renderIPTypeResults(r: Record<string, any>): string {
       ${cell(ipinfo.error ? '' : (ipinfo.type || '—'), ipinfo.error)}
     </tr>
     <tr>
-      <td class="src-name">🌐 ip-api.com</td>
+      <td class="px-2.5 py-[7px] border-b border-border text-text align-middle font-semibold whitespace-nowrap text-cyan">🌐 ip-api.com</td>
       ${cell(ipapi.error ? '' : escapeHTML(ipapi.ip), ipapi.error)}
       ${cell(ipapi.error ? '' : escapeHTML(ipapi.country), ipapi.error)}
       ${cell(ipapi.error ? '' : escapeHTML(ipapi.city), ipapi.error)}
@@ -137,12 +137,12 @@ function renderIPTypeResults(r: Record<string, any>): string {
       ${cell(ipapi.error ? '' : escapeHTML(ipapi.type), ipapi.error)}
     </tr>
     <tr>
-      <td class="src-name">☁️ Cloudflare</td>
+      <td class="px-2.5 py-[7px] border-b border-border text-text align-middle font-semibold whitespace-nowrap text-cyan">☁️ Cloudflare</td>
       ${cell(cf.error ? '' : escapeHTML(cf.ip), cf.error)}
       ${cell(cf.error ? '' : escapeHTML(cf.country), cf.error)}
       ${cell(cf.error ? '' : (cf.colo ? `边缘节点: ${escapeHTML(cf.colo)}` : '—'), cf.error)}
       ${cell('—')}
-      ${cell(cf.error ? '' : (cf.warp === 'on' ? '<span class="iptype-mismatch">WARP VPN</span>' : '未使用 WARP'), cf.error)}
+      ${cell(cf.error ? '' : (cf.warp === 'on' ? '<span class="text-red font-semibold">WARP VPN</span>' : '未使用 WARP'), cf.error)}
     </tr>
   </table></div>`;
 
@@ -152,18 +152,18 @@ function renderIPTypeResults(r: Record<string, any>): string {
   if (!countryConsistent) issues.push(`国家判定不一致: ${uniqueCountries.join(' vs ')}`);
 
   if (issues.length === 0) {
-    html += `<div class="iptype-summary"><span style="color:var(--green)">✅</span> 所有数据源结果一致，未发现异常</div>`;
+    html += `<div class="mt-3 px-3.5 py-2.5 bg-bg rounded-lg text-xs flex items-center gap-2"><span style="color:var(--green)">✅</span> 所有数据源结果一致，未发现异常</div>`;
   } else {
-    html += `<div class="iptype-summary" style="border-left:3px solid var(--red)">
+    html += `<div class="mt-3 px-3.5 py-2.5 bg-bg rounded-lg text-xs flex items-center gap-2" style="border-left:3px solid var(--red)">
       <span style="color:var(--red)">⚠️</span>
       <div>${issues.map(i => `<div>${escapeHTML(i)}</div>`).join('')}
-      <div style="color:var(--text-muted);margin-top:4px">不一致可能由代理、VPN 或 CDN 导致</div></div>
+      <div class="text-text-muted mt-1">不一致可能由代理、VPN 或 CDN 导致</div></div>
     </div>`;
   }
 
   // PTR + analysis reasons
   if (local.reasons && local.reasons.length > 0) {
-    html += `<ul class="iptype-reasons">${local.reasons.map((rr: string) => `<li><span style="color:var(--cyan)">▸</span> ${escapeHTML(rr)}</li>`).join('')}</ul>`;
+    html += `<ul class="list-none p-0 m-0">${local.reasons.map((rr: string) => `<li class="text-[11px] text-text-muted py-1 border-b border-border flex items-center gap-1.5 last:border-b-0"><span class="text-cyan">▸</span> ${escapeHTML(rr)}</li>`).join('')}</ul>`;
   }
 
   return html;
@@ -207,18 +207,18 @@ export default function IPTypeSection() {
   }
 
   return (
-    <div class="iptype-section">
-      <div class="iptype-header">
-        <div class="iptype-header-left">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--cyan)">
+    <div class="mt-4 bg-surface border border-border rounded-[10px] overflow-hidden">
+      <div class="flex items-center justify-between px-[18px] py-3.5">
+        <div class="flex items-center gap-2 text-[13px] font-semibold text-text">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-cyan">
             <circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>
           </svg>
           IP 类型 / 多源对比
         </div>
-        <button class="btn-iptype" disabled={testing()} onClick={runIPTypeTest}>{btnText()}</button>
+        <button class="text-xs px-3.5 py-[5px] rounded-md border border-border bg-surface text-text cursor-pointer transition-all duration-150 hover:not-disabled:bg-bg disabled:opacity-50 disabled:cursor-default" disabled={testing()} onClick={runIPTypeTest}>{btnText()}</button>
       </div>
       <Show when={bodyVisible()}>
-        <div class="iptype-body" innerHTML={bodyHTML()}></div>
+        <div class="px-[18px] pb-[18px]" innerHTML={bodyHTML()}></div>
       </Show>
     </div>
   );
