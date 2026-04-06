@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "..";
 
 /* ── Custom design tokens (matching original global.css) ── */
 @theme {

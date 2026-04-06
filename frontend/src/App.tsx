@@ -87,18 +87,20 @@ export default function App() {
     let elapsed = 0; if (timerInterval) clearInterval(timerInterval);
     timerInterval = setInterval(() => { elapsed++; setProgress(Math.min(90, elapsed * (90 / (DNS_TIMEOUT_MS / 1000)))); }, 1000);
     const token = randToken(); const domain = getDomain(); const img = new Image(); img.src = `http://${token}.${domain}/probe.png?t=${Date.now()}`;
-    const webrtcPromise = detectWebRTCLeaks(null);
     let data: any = null; const deadline = Date.now() + DNS_TIMEOUT_MS; await sleep(500);
     while (Date.now() < deadline) { try { const res = await fetch(`/api/info?token=${token}`); data = await res.json(); if (data.found) break; } catch (e) { console.warn('[poll] fetch error:', e); } const remaining = deadline - Date.now(); if (remaining <= 0) break; await sleep(Math.min(POLL_INTERVAL_MS, remaining)); }
     if (!data || !data.found) { try { const res = await fetch(`/api/info?token=${token}`); data = await res.json(); } catch (_) {} }
     if (timerInterval) clearInterval(timerInterval); setProgress(100);
-    const webrtcResult = await webrtcPromise; const clientIPForWebRTC = data ? data.client_ip : null;
-    if (webrtcResult && clientIPForWebRTC) { webrtcResult.leaked = webrtcResult.leaked.filter(ip => ip !== clientIPForWebRTC); }
-    renderWebRTCResult(webrtcResult, clientIPForWebRTC);
     if (!data) { setStatus('error'); setStatusText('检测失败'); setClientIP('请求失败'); setDnsIP('请求失败'); setRefreshDisabled(false); setRefreshSpin(false); return; }
     setClientIP(data.client_ip || '未知'); setClientGeo(data.client_geo || null);
     if (data.found && data.resolver_ip) { setDnsIP(data.resolver_ip); setDnsGeo(data.resolver_geo || null); setDnsFound(true); } else { setDnsIP(null); setDnsFound(false); }
     setStatus('done'); setStatusText('检测完成'); renderCardDetails(data); setSectionsReady(true); setRefreshDisabled(false); setRefreshSpin(false);
+  }
+
+  async function runWebRTCCheck() {
+    setWebrtcVisible(true); setWebrtcIsWarn(false); setWebrtcStatusText('检测中…'); setWebrtcIpsHTML('');
+    const result = await detectWebRTCLeaks(clientIP());
+    renderWebRTCResult(result, clientIP());
   }
 
   onMount(() => { runDetect(); });
@@ -130,6 +132,12 @@ export default function App() {
       </div>
       <Show when={webrtcVisible()}>
         <div class="mt-3 py-[11px] px-4 bg-surface border border-border rounded-lg flex items-start gap-3 text-xs animate-fade-in"><div class={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${webrtcIsWarn() ? 'bg-[rgba(248,81,73,0.1)] text-red' : 'bg-[rgba(63,185,80,0.1)] text-green'}`}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="flex-1 min-w-0"><div class="font-mono text-[10px] text-text-muted tracking-[1px] uppercase mb-[3px]">WebRTC Leak</div><div class="text-xs text-text font-medium mb-1">{webrtcStatusText()}</div><div class="flex flex-wrap gap-[5px] mt-1.5" innerHTML={webrtcIpsHTML()}></div></div></div>
+      </Show>
+      <Show when={!webrtcVisible() && status() === 'done'}>
+        <button class="flex items-center gap-1.5 mx-auto mt-3 px-4 py-1.5 bg-transparent border border-border-muted rounded-md text-text-muted text-[11px] font-sans cursor-pointer transition-colors duration-200 hover:border-purple hover:text-purple hover:bg-[rgba(188,140,255,0.06)]" onClick={runWebRTCCheck}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          检测 WebRTC 泄漏
+        </button>
       </Show>
       <button class="flex items-center gap-[7px] mx-auto mt-5 px-[22px] py-[9px] bg-transparent border border-border rounded-[7px] text-text text-[13px] font-sans cursor-pointer transition-colors duration-200 hover:border-blue hover:text-blue hover:bg-[rgba(88,166,255,0.06)] disabled:opacity-40 disabled:cursor-not-allowed" disabled={refreshDisabled()} onClick={runDetect}>
         <svg class={refreshSpin() ? 'animate-spin' : ''} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
