@@ -27,6 +27,13 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: 构建前端
+        run: cd frontend && bun install --frozen-lockfile && bun run build.ts
+
       - name: 编译
         env:
           GOOS: ${{ matrix.goos }}
@@ -37,7 +44,7 @@ jobs:
       - name: 打包
         run: |
           ARCHIVE=nettrace-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
-          tar -czf "${ARCHIVE}" nettrace index.html
+          tar -czf "${ARCHIVE}" nettrace index.html frontend/public/index.html frontend/dist/
           sha256sum "${ARCHIVE}" > "${ARCHIVE}.sha256"
           echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_ENV
 
