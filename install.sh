@@ -163,7 +163,6 @@ fi
 info "安装到 $INSTALL_DIR ..."
 mkdir -p "$INSTALL_DIR"
 cp "$TMP_DIR/$BINARY_NAME" "$INSTALL_DIR/$BINARY_NAME"
-cp "$TMP_DIR/index.html"   "$INSTALL_DIR/index.html"
 chmod +x "$INSTALL_DIR/$BINARY_NAME"
 
 # ── 创建专用系统用户 ──────────────────────────────────────

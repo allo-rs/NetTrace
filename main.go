@@ -12,17 +12,18 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"embed"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"math"
 	"math/rand"
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -33,6 +34,12 @@ import (
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
+
+//go:embed frontend/public/index.html
+var indexHTML []byte
+
+//go:embed frontend/dist
+var frontendDist embed.FS
 
 // ══════════════════════════════════════════════════════════
 //  日志系统
@@ -1242,27 +1249,21 @@ func (w *WebServer) handleInfo(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (w *WebServer) handleIndex(rw http.ResponseWriter, r *http.Request) {
-	// Serve static assets from frontend/dist/ (JS, CSS, etc.)
+	// Serve static assets from embedded frontend/dist/
 	if r.URL.Path != "/" {
-		fp := filepath.Join("frontend", "dist", filepath.Clean(r.URL.Path))
-		if info, err := os.Stat(fp); err == nil && !info.IsDir() {
-			http.ServeFile(rw, r, fp)
-			return
+		// Strip leading "/" and look in the embed FS
+		sub, err := fs.Sub(frontendDist, "frontend/dist")
+		if err == nil {
+			if f, err := sub.Open(strings.TrimPrefix(r.URL.Path, "/")); err == nil {
+				f.Close()
+				http.FileServer(http.FS(sub)).ServeHTTP(rw, r)
+				return
+			}
 		}
 	}
 
-	// SPA fallback: serve index.html with domain injection
-	data, err := os.ReadFile("frontend/public/index.html")
-	if err != nil {
-		// Fallback to legacy index.html in project root
-		data, err = os.ReadFile("index.html")
-		if err != nil {
-			logger.Error("读取 index.html 失败: %v", err)
-			http.Error(rw, "index.html not found", 500)
-			return
-		}
-	}
-	html := strings.ReplaceAll(string(data), "{{.Domain}}", w.cfg.Domain)
+	// SPA fallback: serve embedded index.html with domain injection
+	html := strings.ReplaceAll(string(indexHTML), "{{.Domain}}", w.cfg.Domain)
 	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
 	rw.Write([]byte(html))
 }

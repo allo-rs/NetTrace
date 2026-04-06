@@ -44,7 +44,7 @@ jobs:
       - name: 打包
         run: |
           ARCHIVE=nettrace-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
-          tar -czf "${ARCHIVE}" nettrace index.html frontend/public/index.html frontend/dist/
+          tar -czf "${ARCHIVE}" nettrace install.sh
           sha256sum "${ARCHIVE}" > "${ARCHIVE}.sha256"
           echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_ENV
 
