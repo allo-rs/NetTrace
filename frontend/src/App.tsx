@@ -11,6 +11,7 @@ import NATSection from './components/NATSection';
 import UnlockSection from './components/UnlockSection';
 import FPSection from './components/FPSection';
 import IPTypeSection from './components/IPTypeSection';
+import SplitCheckSection from './components/SplitCheckSection';
 
 interface WebRTCResult { local: string[]; leaked: string[]; }
 
@@ -151,7 +152,7 @@ export default function App() {
       </button>
       <Show when={sectionsReady()}>
         <TabNav activeTab={activeTab} setActiveTab={setActiveTab} />
-        <div class={activeTab() === 'tab-network' ? 'block' : 'hidden'}><LeakSection /><IPv6Section /></div>
+        <div class={activeTab() === 'tab-network' ? 'block' : 'hidden'}><LeakSection /><IPv6Section /><SplitCheckSection /></div>
         <div class={activeTab() === 'tab-performance' ? 'block' : 'hidden'}><SpeedSection /><TraceSection clientIP={clientIP()} /><DNSBenchSection /></div>
         <div class={activeTab() === 'tab-security' ? 'block' : 'hidden'}><NATSection /><UnlockSection /><IPTypeSection /><FPSection /></div>
       </Show>

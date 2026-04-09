@@ -986,6 +986,17 @@ func isPrivateIP(s string) bool {
 	return false
 }
 
+// isFakeIPRange 检测是否为代理工具常用的 Fake IP 段（RFC 2544 基准测试保留段）。
+// Surge/Clash 等工具默认使用 198.18.0.0/15 作为 fake-ip-range。
+func isFakeIPRange(s string) bool {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		return false
+	}
+	_, fakeRange, _ := net.ParseCIDR("198.18.0.0/15")
+	return fakeRange.Contains(ip)
+}
+
 // ══════════════════════════════════════════════════════════
 //  IP 类型识别
 // ══════════════════════════════════════════════════════════
@@ -2207,6 +2218,70 @@ func (w *WebServer) handleHeaders(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(resp)
 }
 
+// handleDNSResolve 解析域名，返回首个 IP 及地理归属信息。
+// GET /api/dns-resolve?domain=example.com
+func (w *WebServer) handleDNSResolve(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+	rw.Header().Set("Access-Control-Allow-Origin", "*")
+
+	domain := r.URL.Query().Get("domain")
+	if domain == "" {
+		rw.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(rw).Encode(map[string]string{"error": "缺少 domain 参数"})
+		return
+	}
+
+	// 简单防注入：仅允许合法域名字符
+	for _, c := range domain {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '-') {
+			rw.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(rw).Encode(map[string]string{"error": "域名格式无效"})
+			return
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	// 优先使用系统 DNS（能反映代理 Real IP 模式下的实际出口）
+	addrs, err := net.DefaultResolver.LookupHost(ctx, domain)
+
+	// 若系统 DNS 返回私有 IP（代理 Fake IP 模式，如 198.18.0.0/15），
+	// fallback 到公共 DNS 获取真实公网 IP
+	isFakeResult := err == nil && len(addrs) > 0 && (isPrivateIP(addrs[0]) || isFakeIPRange(addrs[0]))
+	if err != nil || len(addrs) == 0 || isFakeResult {
+		for _, dnsAddr := range []string{"8.8.8.8:53", "1.1.1.1:53"} {
+			addr := dnsAddr
+			resolver := &net.Resolver{
+				PreferGo: true,
+				Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+					return (&net.Dialer{Timeout: 3 * time.Second}).DialContext(ctx, "udp", addr)
+				},
+			}
+			if a, e := resolver.LookupHost(ctx, domain); e == nil && len(a) > 0 {
+				addrs, err = a, e
+				break
+			}
+		}
+	}
+	if err != nil || len(addrs) == 0 {
+		json.NewEncoder(rw).Encode(map[string]any{"domain": domain, "ip": "", "error": "解析失败"})
+		return
+	}
+
+	// 优先取 IPv4
+	ip := addrs[0]
+	for _, a := range addrs {
+		if net.ParseIP(a).To4() != nil {
+			ip = a
+			break
+		}
+	}
+
+	geo, _ := getGeoInfoCached(ip, w.geoCache)
+	json.NewEncoder(rw).Encode(map[string]any{"domain": domain, "ip": ip, "geo": geo})
+}
+
 // handleIPType 返回客户端 IP 的类型识别结果。
 func (w *WebServer) handleIPType(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Access-Control-Allow-Origin", "*")
@@ -2307,6 +2382,7 @@ func main() {
 	mux.HandleFunc("/api/ip-type", webServer.handleIPType)
 	mux.HandleFunc("/api/ip-check", webServer.handleIPCheck)
 	mux.HandleFunc("/api/dns-bench", webServer.handleDNSBench)
+	mux.HandleFunc("/api/dns-resolve", webServer.handleDNSResolve)
 
 	logger.Info("HTTP 开始监听 %s", cfg.WebPort)
 	if err := http.ListenAndServe(cfg.WebPort, mux); err != nil {
