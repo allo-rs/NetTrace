@@ -2298,6 +2298,228 @@ func (w *WebServer) handleIPType(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(result)
 }
 
+// ══════════════════════════════════════════════════════════
+//  线路质量检测
+// ══════════════════════════════════════════════════════════
+
+// BackboneNode 表示路径中识别到的骨干网节点。
+type BackboneNode struct {
+	Hop    int    `json:"hop"`
+	IP     string `json:"ip"`
+	Name   string `json:"name"`    // 如 "CN2", "163", "CU169"
+	NameCN string `json:"name_cn"` // 如 "中国电信 CN2"
+	ASN    uint   `json:"asn"`
+}
+
+// RouteQualityResult 是线路检测的最终结论。
+type RouteQualityResult struct {
+	Target    string         `json:"target"`
+	RouteType string         `json:"route_type"`    // "cn2_gia", "cn2_gt", "ct163", "cu169", "cug", "cmi", "cmnet", "cernet", "direct", "unknown"
+	RouteDesc string         `json:"route_desc"`    // 中文描述
+	Quality   string         `json:"quality"`       // "premium", "good", "standard", "unknown"
+	Score     int            `json:"score"`         // 0-100 质量评分
+	Backbones []BackboneNode `json:"backbones"`     // 识别到的骨干节点
+	Hops      []TracerouteHop `json:"hops"`
+	Error     string         `json:"error,omitempty"`
+}
+
+// 已知骨干网 ASN 映射
+var backboneASNs = map[uint]struct{ name, nameCN string }{
+	4809:  {"CN2", "中国电信 CN2（AS4809）"},
+	4134:  {"CT163", "中国电信 163 骨干（AS4134）"},
+	23764: {"CTG", "中国电信国际（AS23764）"},
+	4837:  {"CU169", "中国联通 169 骨干（AS4837）"},
+	10099: {"CUG", "中国联通国际（AS10099）"},
+	58453: {"CMI", "中国移动国际（AS58453）"},
+	9808:  {"CMNET", "中国移动骨干（AS9808）"},
+	56040: {"CMNET", "中国移动（AS56040）"},
+	4538:  {"CERNET", "中国教育网（AS4538）"},
+}
+
+// 已知骨干网 IP 前缀（/16 精度）
+var backbonePrefixes = []struct {
+	prefix string
+	asn    uint
+}{
+	{"59.43.", 4809},   // 电信 CN2
+	{"202.97.", 4134},  // 电信 163
+	{"219.158.", 4837}, // 联通 169
+	{"210.51.", 4837},  // 联通 169
+	{"211.136.", 9808}, // 移动
+	{"221.183.", 9808}, // 移动
+}
+
+// detectBackboneByIP 通过 IP 前缀识别骨干网 ASN（补充 MaxMind 未覆盖的私有段）。
+func detectBackboneByIP(ip string) (uint, bool) {
+	for _, p := range backbonePrefixes {
+		if strings.HasPrefix(ip, p.prefix) {
+			return p.asn, true
+		}
+	}
+	return 0, false
+}
+
+// classifyRouteQuality 分析 traceroute 结果，识别线路类型和质量。
+func classifyRouteQuality(target string, hops []TracerouteHop) RouteQualityResult {
+	result := RouteQualityResult{
+		Target: target,
+		Hops:   hops,
+	}
+
+	// 统计路径中出现的骨干网 ASN
+	asnSeen := map[uint]bool{}
+	for _, hop := range hops {
+		if hop.IP == "" {
+			continue
+		}
+		// 优先用 MaxMind ASN 数据
+		if hop.Geo != nil && hop.Geo.ASN != 0 {
+			if info, ok := backboneASNs[hop.Geo.ASN]; ok {
+				asnSeen[hop.Geo.ASN] = true
+				result.Backbones = append(result.Backbones, BackboneNode{
+					Hop:    hop.Hop,
+					IP:     hop.IP,
+					Name:   info.name,
+					NameCN: info.nameCN,
+					ASN:    hop.Geo.ASN,
+				})
+				continue
+			}
+		}
+		// 回退到 IP 前缀匹配
+		if asn, ok := detectBackboneByIP(hop.IP); ok {
+			if !asnSeen[asn] || true {
+				info := backboneASNs[asn]
+				asnSeen[asn] = true
+				result.Backbones = append(result.Backbones, BackboneNode{
+					Hop:    hop.Hop,
+					IP:     hop.IP,
+					Name:   info.name,
+					NameCN: info.nameCN,
+					ASN:    asn,
+				})
+			}
+		}
+	}
+
+	has4809 := asnSeen[4809]   // CN2
+	has4134 := asnSeen[4134]   // 163
+	has23764 := asnSeen[23764] // CTG
+	has4837 := asnSeen[4837]   // 联通169
+	has10099 := asnSeen[10099] // CUG
+	has58453 := asnSeen[58453] // CMI
+	has9808 := asnSeen[9808] || asnSeen[56040] // 移动
+	has4538 := asnSeen[4538]   // CERNET
+
+	switch {
+	case has4809 && !has4134:
+		result.RouteType = "cn2_gia"
+		result.RouteDesc = "中国电信 CN2 GIA（全程 CN2，高端线路）"
+		result.Quality = "premium"
+		result.Score = 95
+	case has4809 && has4134:
+		result.RouteType = "cn2_gt"
+		result.RouteDesc = "中国电信 CN2 GT（去程 CN2，回程 163）"
+		result.Quality = "good"
+		result.Score = 80
+	case has23764 && !has4809:
+		result.RouteType = "ctg"
+		result.RouteDesc = "中国电信国际（CTG）"
+		result.Quality = "good"
+		result.Score = 75
+	case has4134:
+		result.RouteType = "ct163"
+		result.RouteDesc = "中国电信 163 骨干（普通线路）"
+		result.Quality = "standard"
+		result.Score = 60
+	case has10099:
+		result.RouteType = "cug"
+		result.RouteDesc = "中国联通国际（CUG，AS10099）"
+		result.Quality = "good"
+		result.Score = 80
+	case has4837:
+		result.RouteType = "cu169"
+		result.RouteDesc = "中国联通 169 骨干（AS4837）"
+		result.Quality = "standard"
+		result.Score = 60
+	case has58453:
+		result.RouteType = "cmi"
+		result.RouteDesc = "中国移动国际（CMI，AS58453）"
+		result.Quality = "good"
+		result.Score = 75
+	case has9808:
+		result.RouteType = "cmnet"
+		result.RouteDesc = "中国移动骨干（CMNET）"
+		result.Quality = "standard"
+		result.Score = 55
+	case has4538:
+		result.RouteType = "cernet"
+		result.RouteDesc = "中国教育网（CERNET）"
+		result.Quality = "standard"
+		result.Score = 65
+	default:
+		if len(hops) > 0 {
+			result.RouteType = "direct"
+			result.RouteDesc = "未识别到已知骨干网"
+			result.Quality = "unknown"
+			result.Score = 50
+		} else {
+			result.RouteType = "unknown"
+			result.RouteDesc = "追踪失败，无法识别线路"
+			result.Quality = "unknown"
+			result.Score = 0
+		}
+	}
+
+	return result
+}
+
+// handleRouteQuality 执行 traceroute 并返回线路质量分析结果。
+func (w *WebServer) handleRouteQuality(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Access-Control-Allow-Origin", "*")
+	rw.Header().Set("Content-Type", "application/json")
+
+	target := strings.TrimSpace(r.URL.Query().Get("target"))
+	if target == "" {
+		target = "114.114.114.114" // 默认探测国内 DNS
+	}
+
+	// 校验格式
+	validTarget := regexp.MustCompile(`^[a-zA-Z0-9.\-:]+$`)
+	if !validTarget.MatchString(target) {
+		rw.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(rw).Encode(RouteQualityResult{Error: "目标格式无效"})
+		return
+	}
+	if ip := net.ParseIP(target); ip != nil && isPrivateIP(target) {
+		rw.WriteHeader(http.StatusForbidden)
+		json.NewEncoder(rw).Encode(RouteQualityResult{Error: "不允许探测私有 IP"})
+		return
+	}
+
+	// 速率限制（复用 trace 限速器）
+	clientIP := getClientIP(r)
+	if !w.traceRL.Allow(clientIP) {
+		rw.WriteHeader(http.StatusTooManyRequests)
+		json.NewEncoder(rw).Encode(RouteQualityResult{Error: "请求频率过高，请稍后再试"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
+	defer cancel()
+
+	hopCh := make(chan TracerouteHop, 32)
+	go runTraceroute(ctx, target, w.geoCache, hopCh)
+
+	var hops []TracerouteHop
+	for hop := range hopCh {
+		hops = append(hops, hop)
+	}
+
+	result := classifyRouteQuality(target, hops)
+	json.NewEncoder(rw).Encode(result)
+}
+
 // handleIPCheck 代理查询 ip-api.com 获取客户端 IP 信息（避免 CORS 限制）。
 func (w *WebServer) handleIPCheck(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Access-Control-Allow-Origin", "*")
@@ -2383,6 +2605,7 @@ func main() {
 	mux.HandleFunc("/api/ip-check", webServer.handleIPCheck)
 	mux.HandleFunc("/api/dns-bench", webServer.handleDNSBench)
 	mux.HandleFunc("/api/dns-resolve", webServer.handleDNSResolve)
+	mux.HandleFunc("/api/route-quality", webServer.handleRouteQuality)
 
 	logger.Info("HTTP 开始监听 %s", cfg.WebPort)
 	if err := http.ListenAndServe(cfg.WebPort, mux); err != nil {
