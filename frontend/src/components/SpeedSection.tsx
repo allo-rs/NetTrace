@@ -44,11 +44,9 @@ async function measureDownload(onProgress: (mbps: number) => void, signal?: Abor
 }
 
 async function measureUpload(_onProgress: (mbps: number) => void, signal?: AbortSignal) {
-  const warmup = new Uint8Array(1000000);
-  crypto.getRandomValues(warmup);
+  const warmup = new Uint8Array(1000000).fill(0x61);
   await fetch(CF_UP, { method: 'POST', body: warmup, mode: 'cors', signal });
-  const data = new Uint8Array(10000000);
-  crypto.getRandomValues(data);
+  const data = new Uint8Array(10000000).fill(0x61);
   const start = performance.now();
   await fetch(CF_UP, { method: 'POST', body: data, mode: 'cors', signal });
   return (data.length * 8) / ((performance.now() - start) / 1000 * 1000000);
