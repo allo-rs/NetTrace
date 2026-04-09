@@ -1754,7 +1754,7 @@ func runTraceroute(ctx context.Context, target string, geoCache *GeoCache, hopCh
 	}
 	defer conn.Close()
 
-	pconn := ipv4.NewPacketConn(conn)
+	pconn := conn.IPv4PacketConn()
 	// 会话唯一 ID，避免并发追踪冲突
 	echoID := rand.Intn(0xffff)
 
