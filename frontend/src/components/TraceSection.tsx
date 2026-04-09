@@ -16,12 +16,21 @@ const BACKBONE_ASN: Record<number, { name: string; cls: string }> = {
 };
 
 const BACKBONE_PREFIX: Array<{ prefix: string; asn: number }> = [
+  // 电信
   { prefix: '59.43.',   asn: 4809 },
   { prefix: '202.97.',  asn: 4134 },
+  // 联通
   { prefix: '219.158.', asn: 4837 },
   { prefix: '210.51.',  asn: 4837 },
+  { prefix: '202.96.',  asn: 4837 },
+  { prefix: '61.135.',  asn: 4837 },
+  { prefix: '60.208.',  asn: 4837 },
+  // 移动
   { prefix: '211.136.', asn: 9808 },
   { prefix: '221.183.', asn: 9808 },
+  { prefix: '120.196.', asn: 9808 },
+  { prefix: '117.131.', asn: 9808 },
+  { prefix: '223.104.', asn: 56040 },
 ];
 
 function getBackbone(ip?: string, geo?: GeoInfo) {
@@ -51,11 +60,12 @@ function analyzeRoute(names: string[]): { label: string; desc: string; score: nu
 
 // 预设探测目标
 const PRESETS = [
-  { label: '追踪我',       value: '__client__' },
-  { label: '电信 DNS',     value: '114.114.114.114' },
-  { label: '阿里 DNS',     value: '223.5.5.5'       },
-  { label: 'Cloudflare',  value: '1.1.1.1'          },
-  { label: 'Google DNS',  value: '8.8.8.8'          },
+  { label: '追踪我',      value: '__client__'    },
+  { label: '电信',        value: '114.114.114.114' },
+  { label: '联通',        value: '218.104.111.114' },
+  { label: '移动',        value: '120.196.165.24'  },
+  { label: '阿里 DNS',    value: '223.5.5.5'       },
+  { label: 'Cloudflare', value: '1.1.1.1'          },
 ];
 
 interface TraceHop {
