@@ -17,21 +17,17 @@ async function fetchLocal(): Promise<any> {
 }
 
 async function fetchIpinfo(): Promise<any> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 8000);
-  try {
-    const resp = await fetch('https://ipinfo.io/json', { signal: ctrl.signal });
-    const d = await resp.json();
-    clearTimeout(timer);
-    const orgParts = (d.org || '').split(' ');
-    const asn = orgParts[0] || '';
-    const org = orgParts.slice(1).join(' ') || d.org || '';
-    return {
-      ip: d.ip, country: d.country || '', city: d.city || '',
-      asn: asn, org: org, region: d.region || '',
-      type: d.company?.type || '', hostname: d.hostname || '',
-    };
-  } finally { clearTimeout(timer); }
+  const resp = await fetch('/api/ipinfo', { cache: 'no-store' });
+  const d = await resp.json();
+  if (d.error) throw new Error(d.error);
+  const orgParts = (d.org || '').split(' ');
+  const asn = orgParts[0] || '';
+  const org = orgParts.slice(1).join(' ') || d.org || '';
+  return {
+    ip: d.ip, country: d.country || '', city: d.city || '',
+    asn: asn, org: org, region: d.region || '',
+    type: d.company?.type || '', hostname: d.hostname || '',
+  };
 }
 
 async function fetchIpApi(): Promise<any> {
