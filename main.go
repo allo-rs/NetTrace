@@ -137,6 +137,7 @@ type Config struct {
 	GeoDBPath     string // MaxMind GeoLite2-City 数据库文件路径
 	ASNDBPath     string // MaxMind GeoLite2-ASN 数据库文件路径
 	GeoLicenseKey string // MaxMind 许可证 Key，用于自动下载/更新数据库
+	IPInfoToken   string // ipinfo.io API Token
 
 	// AllowedZones 是 DNS 查询的域名白名单。
 	// 只有 qname 属于这些区域的查询才会被处理，其他返回 REFUSED。
@@ -165,6 +166,7 @@ func buildConfig() *Config {
 		GeoDBPath:     getEnv("GEODB_PATH", "GeoLite2-City.mmdb"),
 		ASNDBPath:     getEnv("ASNDB_PATH", "GeoLite2-ASN.mmdb"),
 		GeoLicenseKey: getEnv("MAXMIND_LICENSE_KEY", ""),
+		IPInfoToken:   getEnv("IPINFO_TOKEN", ""),
 	}
 
 	// 白名单始终包含主域名本身
@@ -2544,6 +2546,37 @@ func (w *WebServer) handleIPCheck(rw http.ResponseWriter, r *http.Request) {
 	rw.Write(body)
 }
 
+// handleIPInfo 代理查询 ipinfo.io 获取 IP 详细信息。
+func (w *WebServer) handleIPInfo(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Access-Control-Allow-Origin", "*")
+	rw.Header().Set("Content-Type", "application/json")
+
+	clientIP := getClientIP(r)
+	token := w.cfg.IPInfoToken
+	if token == "" {
+		rw.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(rw).Encode(map[string]string{"error": "IPINFO_TOKEN 未配置"})
+		return
+	}
+
+	apiURL := fmt.Sprintf("https://api.ipinfo.io/lookup/%s?token=%s", clientIP, token)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	req, _ := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+	req.Header.Set("Accept", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		rw.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(rw).Encode(map[string]string{"error": fmt.Sprintf("ipinfo.io 查询失败: %v", err)})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
+	rw.Write(body)
+}
+
 func main() {
 	cfg := buildConfig()
 
@@ -2603,6 +2636,7 @@ func main() {
 	mux.HandleFunc("/api/headers", webServer.handleHeaders)
 	mux.HandleFunc("/api/ip-type", webServer.handleIPType)
 	mux.HandleFunc("/api/ip-check", webServer.handleIPCheck)
+	mux.HandleFunc("/api/ipinfo", webServer.handleIPInfo)
 	mux.HandleFunc("/api/dns-bench", webServer.handleDNSBench)
 	mux.HandleFunc("/api/dns-resolve", webServer.handleDNSResolve)
 	mux.HandleFunc("/api/route-quality", webServer.handleRouteQuality)
