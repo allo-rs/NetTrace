@@ -40,6 +40,7 @@ load_existing_config() {
           DNS_DOMAIN)         OLD_DNS_DOMAIN="$val" ;;
           NS_IP)              OLD_NS_IP="$val" ;;
           MAXMIND_LICENSE_KEY) OLD_MAXMIND_LICENSE_KEY="$val" ;;
+          IPINFO_TOKEN)        OLD_IPINFO_TOKEN="$val" ;;
           WEB_PORT)           OLD_WEB_PORT="$val" ;;
           DNS_PORT)           OLD_DNS_PORT="$val" ;;
           LOG_LEVEL)          OLD_LOG_LEVEL="$val" ;;
@@ -118,7 +119,7 @@ fi
 tar -xzf "$TMP_DIR/$ARCHIVE" -C "$TMP_DIR"
 
 # ── 配置参数 ──────────────────────────────────────────────
-OLD_DNS_DOMAIN="" OLD_NS_IP="" OLD_MAXMIND_LICENSE_KEY=""
+OLD_DNS_DOMAIN="" OLD_NS_IP="" OLD_MAXMIND_LICENSE_KEY="" OLD_IPINFO_TOKEN=""
 OLD_WEB_PORT="" OLD_DNS_PORT="" OLD_LOG_LEVEL=""
 load_existing_config
 
@@ -143,6 +144,18 @@ if [[ -z "${MAXMIND_LICENSE_KEY:-}" ]]; then
     [[ -n "$OLD_MAXMIND_LICENSE_KEY" ]] && local_hint="（回车保留旧值）"
     read -rp "  请输入 MaxMind License Key（留空跳过）$local_hint: " MAXMIND_LICENSE_KEY < /dev/tty
     [[ -z "$MAXMIND_LICENSE_KEY" && -n "$OLD_MAXMIND_LICENSE_KEY" ]] && MAXMIND_LICENSE_KEY="$OLD_MAXMIND_LICENSE_KEY"
+  fi
+fi
+
+if [[ -z "${IPINFO_TOKEN:-}" ]]; then
+  if [[ -n "$OLD_IPINFO_TOKEN" ]] && ! $FORCE_RECONFIG; then
+    info "  IPINFO_TOKEN = ***（沿用已有配置）"
+    IPINFO_TOKEN="$OLD_IPINFO_TOKEN"
+  else
+    local_hint=""
+    [[ -n "$OLD_IPINFO_TOKEN" ]] && local_hint="（回车保留旧值）"
+    read -rp "  请输入 ipinfo.io Token（留空跳过）$local_hint: " IPINFO_TOKEN < /dev/tty
+    [[ -z "$IPINFO_TOKEN" && -n "$OLD_IPINFO_TOKEN" ]] && IPINFO_TOKEN="$OLD_IPINFO_TOKEN"
   fi
 fi
 
@@ -178,6 +191,8 @@ setcap 'cap_net_bind_service,cap_net_raw=+ep' "$INSTALL_DIR/$BINARY_NAME" 2>/dev
 # ── 写入 systemd 服务 ─────────────────────────────────────
 GEO_KEY_LINE=""
 [[ -n "$MAXMIND_LICENSE_KEY" ]] && GEO_KEY_LINE="Environment=MAXMIND_LICENSE_KEY=${MAXMIND_LICENSE_KEY}"
+IPINFO_TOKEN_LINE=""
+[[ -n "$IPINFO_TOKEN" ]] && IPINFO_TOKEN_LINE="Environment=IPINFO_TOKEN=${IPINFO_TOKEN}"
 
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
 [Unit]
@@ -200,6 +215,7 @@ Environment=LOG_LEVEL=${LOG_LEVEL}
 Environment=GEODB_PATH=${INSTALL_DIR}/GeoLite2-City.mmdb
 Environment=ASNDB_PATH=${INSTALL_DIR}/GeoLite2-ASN.mmdb
 ${GEO_KEY_LINE}
+${IPINFO_TOKEN_LINE}
 
 [Install]
 WantedBy=multi-user.target
@@ -217,6 +233,7 @@ info "  公网 IP:  $NS_IP"
 info "  Web 端口: $WEB_PORT"
 info "  DNS 端口: $DNS_PORT"
 info "  MaxMind:  ${MAXMIND_LICENSE_KEY:+已配置}${MAXMIND_LICENSE_KEY:-未配置}"
+info "  IPInfo:   ${IPINFO_TOKEN:+已配置}${IPINFO_TOKEN:-未配置}"
 echo ""
 info "  服务状态: systemctl status $SERVICE_NAME"
 info "  实时日志: journalctl -u $SERVICE_NAME -f"
