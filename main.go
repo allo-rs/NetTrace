@@ -2595,6 +2595,11 @@ func main() {
 	logger.Info("Geo 缓存TTL : %v", geoCacheTTL)
 	logger.Info("City 数据库 : %s", cfg.GeoDBPath)
 	logger.Info("ASN 数据库  : %s", cfg.ASNDBPath)
+	if cfg.IPInfoToken != "" {
+		logger.Info("IPInfo      : 已配置")
+	} else {
+		logger.Info("IPInfo      : 未配置（/api/ipinfo 不可用）")
+	}
 	if cfg.GeoLicenseKey != "" {
 		logger.Info("MaxMind Key : 已设置（自动下载/每日更新已启用）")
 	} else {
