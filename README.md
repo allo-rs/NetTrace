@@ -82,6 +82,7 @@ make build-all
 | `DNS_PORT` | `:53` | DNS 监听端口 |
 | `LOG_LEVEL` | `info` | 日志等级（debug/info/warn/error） |
 | `MAXMIND_LICENSE_KEY` | — | MaxMind GeoLite2 许可证（自动下载数据库） |
+| `IPINFO_TOKEN` | — | [ipinfo.io](https://ipinfo.io) API Token，启用 `/api/ipinfo` 渠道 |
 | `DNS_ALLOW_ZONES` | — | 追加白名单区域，逗号分隔 |
 
 ---
