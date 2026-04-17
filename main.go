@@ -2559,7 +2559,7 @@ func (w *WebServer) handleIPInfo(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apiURL := fmt.Sprintf("https://api.ipinfo.io/lookup/%s?token=%s", clientIP, token)
+	apiURL := fmt.Sprintf("https://ipinfo.io/%s/json?token=%s", clientIP, token)
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
